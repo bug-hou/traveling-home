@@ -31,6 +31,13 @@ export interface NodeAccess {
   previewable: boolean;
 }
 
+export interface NodeLocation {
+  latitude: number;
+  longitude: number;
+  placeName: string | null;
+  source: 'manual';
+}
+
 const sortOptions: Record<NodeSort, { sortBy: string; sortOrder: string }> = {
   name: { sortBy: 'name', sortOrder: 'asc' },
   updated: { sortBy: 'updatedAt', sortOrder: 'desc' },
@@ -47,8 +54,16 @@ export const nodesApi = {
   search(query: string, offset = 0) {
     return apiRequest<NodeListResponse>(`/api/v1/nodes/search?${new URLSearchParams({ q: query, offset: String(offset), limit: '100' })}`);
   },
-  detail(id: string) {
-    return apiRequest<{ node: NodeSummary; ancestors: NodeSummary[] }>(`/api/v1/nodes/${encodeURIComponent(id)}`);
+  detail(id: string, signal?: AbortSignal) {
+    return apiRequest<{ node: NodeSummary; ancestors: NodeSummary[] }>(`/api/v1/nodes/${encodeURIComponent(id)}`, { signal });
+  },
+  location(id: string, signal?: AbortSignal) {
+    return apiRequest<{ location: NodeLocation | null }>(`/api/v1/nodes/${encodeURIComponent(id)}/location`, { signal });
+  },
+  saveLocation(id: string, data: { latitude: number; longitude: number; placeName: string | null }) {
+    return apiRequest<{ location: NodeLocation }>(`/api/v1/nodes/${encodeURIComponent(id)}/location`, {
+      method: 'PATCH', body: JSON.stringify(data),
+    });
   },
   createFolder(name: string, parentId: string | null) {
     return apiRequest<{ node: NodeSummary }>('/api/v1/nodes/folder', {

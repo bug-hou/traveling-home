@@ -19,7 +19,6 @@
 | `home.recentFiles` | 内容区 | 最近四个真实文件，按需获取私有图片访问链接 |
 | `home.recentTrips` | 内容区 | 旅行处理未就绪的明确提示 |
 | `home.profile` | PC 侧栏 / H5 我的 | 当前用户与账号设置入口 |
-| `home.preview` | 弹层 | 私有素材预览/下载；签名 URL 隐藏于 Agent 快照之外 |
 
 ## 可执行动作
 
@@ -33,11 +32,10 @@
 | `home.header.upload`、`home.hero.upload`、`home.welcome.upload`、`home.onboarding.upload`、`nav.mobile.upload` | 链接 | 进入已有上传页 | 无 | 否 |
 | `nav.account`、`nav.mobile.account` | 链接 | 账号设置 | 无 | 否 |
 | `home.storage.viewFiles` | 链接 | 查看已入库文件 | 无 | 否 |
-| `home.recentFiles.open.{nodeId}` | 按钮 | 按需预览真实最近文件 | nodeId | 否 |
-| `home.preview.close`、`home.preview.download` | 按钮 | 关闭弹层/重新签名下载原片 | nodeId | 否 |
+| `home.recentFiles.open.{nodeId}` | 按钮 | 跳转到受保护的素材预览与定位页 | nodeId | 否 |
 | `home.summary.retry` | 按钮 | 整页请求失败时重新拉取汇总 | 无 | 否 |
 | `tool: homeApi.summary` | 服务 | 按登录用户获取首页各模块汇总数据 | recentLimit | 否 |
-| `tool: nodesApi.access` | 服务 | 根据当前用户权限签署缩略图/原片预览/下载地址 | nodeId, purpose | 否 |
+| `tool: nodesApi.access` | 服务 | 根据当前用户权限按需签署最近素材卡片图片链接；下载与原片预览在独立预览页处理 | nodeId, purpose | 否 |
 
 ## 页面可读状态
 
@@ -52,7 +50,7 @@
 ## 跳转
 
 - 未登录访问 `/` 会转到 `/login`；成功登录后保留并返回原受保护路径。
-- 可前往：文件、我的分享、上传、账号设置；足迹地图、旅行列表和回收站仍禁用。
+- 可前往：文件、我的分享、上传、账号设置；点击最近素材进入 `/preview/:nodeId`。足迹地图、旅行列表和回收站仍禁用。
 - 登录用户访问 `/login` 或 `/register` 会转到 `/`。
 
 ## 特殊说明

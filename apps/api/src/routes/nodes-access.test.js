@@ -107,6 +107,19 @@ test('unsafe MIME downloads as octet-stream; never inline HTML or user supplied 
   assert.equal(foreignKey.statusCode, 409);
 });
 
+test('owner download appends the image extension without changing the stored display name', async (t) => {
+  const ctx = createApp(); await ctx.ready(); t.after(() => ctx.app.close());
+  const node = file(ctx.userId, { name: '头像', mime: 'image/jpeg' });
+  ctx.docs.push(node);
+  const url = `/api/v1/nodes/${node._id}/url?purpose=download`;
+  const download = await ctx.app.inject({ url, headers: { 'x-test-user': String(ctx.userId) } });
+  assert.equal(download.statusCode, 200, download.body);
+  assert.equal(download.json().name, '头像');
+  assert.equal(download.json().mime, 'image/jpeg');
+  assert.equal(ctx.calls.at(-1).options.mime, 'image/jpeg');
+  assert.equal(ctx.calls.at(-1).options.disposition, 'attachment; filename="download.jpg"; filename*=UTF-8\'\'%E5%A4%B4%E5%83%8F.jpg');
+});
+
 test('thumbnail URL requires explicit opt-in and a small allowed image with owner permissions', async (t) => {
   const disabled = createApp();
   await disabled.ready();

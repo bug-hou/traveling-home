@@ -18,7 +18,8 @@
 | `register` | `/register` | 注册 | `register.md` |
 | `account` | `/settings/account` | 账号与安全设置 | `account.md` |
 | `upload` | `/upload` | 上传素材与队列（含失败重试） | `upload.md` |
-| `files` | `/files/:folderId?` | 文件浏览与管理、按需安全预览 | `files.md` |
+| `files` | `/files/:folderId?` | 文件浏览与管理，打开文件进入详情 | `files.md` |
+| `preview` | `/preview/:nodeId` | 私有素材预览与手动位置标记 | `preview.md` |
 | `shares` | `/shares`、`/shares/new?targetId=...`、`/shares/:id/edit` | 网盘式分享管理、状态筛选及配置 | `shares.md` |
 | `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 公开目录浏览与活动作品展示 | `publicShare.md` |
 
@@ -64,9 +65,11 @@ Arco 复杂组件（Select、DatePicker、Dropdown、Tabs、Upload 等）的 `da
 | 文件页 `Select` | 实测 `data-agent-id="files.toolbar.sort"` 落在可聚焦、可点击的 `div[role="combobox"]`；`Select.Option` 的 `data-agent-id` 落在实际 `li[role="option"]`。选项浮层挂载在 `.files-app` 内，外围 `data-agent-region="files.toolbar.sortOptions"`。 |
 | 文件页 `Dropdown` + `Menu.Item` | 实测菜单触发器是 `button[data-agent-id]`，菜单项是 `button[role="menuitem"][data-agent-id]`，危险选项属性保留；Menu 根节点在 Portal 中带 `data-agent-region="files.row.{nodeId}.menu"`。 |
 | 文件页 `Modal` | 实测 `data-agent-region` 落在 Portal 的 `.arco-modal-wrapper`，弹窗本体是 `[role="dialog"][aria-modal="true"]`；自定义关闭、确认、取消按钮在弹窗中，名称输入打开后获得焦点。关闭后文件页将焦点还给触发器。 |
+| 素材预览页 `Modal` | 实测 `data-agent-region="preview.editor"` 落在 `.arco-modal-wrapper`，有名字的 `dialog` 中经纬度输入与保存/取消按钮均落在原生节点且有 `data-agent-id`；390px 手机弹层贴底，不横向溢出。 |
 | 上传页 `Modal` | 实测 `data-agent-region="upload.destination.dialog"` 落在 Portal wrapper，内层为有名字的 `dialog`；关闭、目录按钮均保留原始 `data-agent-id`，取消后焦点回到“更改目录”。 |
 | 上传页 `Progress` | 内部自带 `role="progressbar"` 与当前百分比；外部包装使用有名称的 `role="group"`，避免重复进度条语义。 |
 | 认证与账号页 `Input` / `Input.Password` / `Button` | 实测 `data-agent-id` 与密码输入的 `data-agent-ignore` 落在原生 `input`；提交的 `data-agent-id` 落在原生 `button[type="submit"]`。密码显隐按钮继续使用独立埋点。 |
+| 文件页 `Input.Search` / `Input` | 实测搜索框 `data-agent-id="files.toolbar.search"` 落在 `input[type="search"]`（`searchbox`，可用 ⌘/Ctrl+K 聚焦）；新建/重命名的 `data-agent-id="files.dialog.name"` 落在 Modal 内自动聚焦的原生 `input`。搜索聚焦只显示外层容器品牌焦点线，不叠加输入内层边框。 |
 
 ## 与业务代码的约定（摘要，完整规则见 `.codebuddy/rules/web-agent-ready.mdc`）
 

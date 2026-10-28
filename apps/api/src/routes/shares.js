@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { fail, parseBody } from '../lib/http.js';
 import { hashPassword, verifyPassword } from '../lib/password.js';
+import { downloadResponse } from '../services/cos.js';
 
 const id = z.string().regex(/^[a-f\d]{24}$/i);
 const handle = z.string().regex(/^[a-z][a-z0-9-]{2,29}$/);
@@ -244,9 +245,9 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     const mime = INLINE.has(node.mime?.toLowerCase()) ? node.mime.toLowerCase() : 'application/octet-stream';
     if (body.purpose === 'preview' && mime === 'application/octet-stream') return fail(reply, 422, 'PREVIEW_UNSUPPORTED', '此格式不支持在线预览');
     const inline = body.purpose === 'preview';
-    const disposition = inline ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(node.name ?? 'download')}`;
+    const response = inline ? { disposition: 'inline', mime } : downloadResponse(node.name, mime);
     let url;
-    try { url = await cos.signReadUrl(node.cosKey, { disposition, mime: inline ? mime : 'application/octet-stream', expires: 60 }); }
+    try { url = await cos.signReadUrl(node.cosKey, { ...response, expires: 60 }); }
     catch (error) {
       req.log.error({ err: error, nodeId: String(nodeId) }, 'unable to sign shared file URL');
       return fail(reply, 503, 'STORAGE_UNAVAILABLE', '文件访问暂不可用');
@@ -261,6 +262,6 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
       const active = await shares.findOne({ _id: share._id, revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] });
       if (!active) return fail(reply, 404, 'SHARE_NOT_FOUND', '分享已失效');
     }
-    return { url, expiresAt: new Date(Date.now() + 60_000), name: node.name, mime: inline ? mime : 'application/octet-stream', previewable: inline };
+    return { url, expiresAt: new Date(Date.now() + 60_000), name: node.name, mime: response.mime, previewable: inline };
   });
 }

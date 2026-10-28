@@ -3,6 +3,7 @@ import test from 'node:test';
 import Fastify from 'fastify';
 import { ObjectId } from 'mongodb';
 import shareRoutes from './shares.js';
+import { downloadResponse } from '../services/cos.js';
 
 function same(a, b) { return a instanceof ObjectId || b instanceof ObjectId ? String(a) === String(b) : a instanceof Date && b instanceof Date ? a.getTime() === b.getTime() : a === b; }
 function matches(doc, query) {
@@ -91,6 +92,50 @@ test('password, login, expiry, preview permission and atomic download issuance l
   assert.equal(ctx.docs.shares[0].passwordHash.startsWith('$argon2id$'), true);
   assert.equal((await ctx.app.inject({ method: 'DELETE', url: `/shares/${ctx.docs.shares[0]._id}`, headers: owner })).statusCode, 204);
   assert.equal((await ctx.app.inject({ method: 'POST', url: '/public/shares/traveler/west-trip/browse', payload, headers: owner })).statusCode, 404);
+});
+
+test('public media downloads retain their real type and a usable file extension', async (t) => {
+  const ctx = fixture(); await ctx.ready(); t.after(() => ctx.app.close());
+  assert.equal((await ctx.create()).statusCode, 201);
+  const image = ctx.docs.nodes.find((item) => same(item._id, ctx.imageId));
+  image.name = '国徽';
+  const download = await ctx.access();
+  assert.equal(download.statusCode, 200, download.body);
+  assert.equal(download.json().mime, 'image/jpeg');
+  assert.equal(download.json().name, '国徽');
+  assert.equal(ctx.calls.at(-1).options.mime, 'image/jpeg');
+  assert.equal(ctx.calls.at(-1).options.disposition, 'attachment; filename="download.jpg"; filename*=UTF-8\'\'%E5%9B%BD%E5%BE%BD.jpg');
+
+  image.name = 'photo.JPEG';
+  await ctx.access();
+  assert.match(ctx.calls.at(-1).options.disposition, /filename\*=UTF-8''photo.JPEG$/);
+  image.name = 'photo.txt';
+  await ctx.access();
+  assert.match(ctx.calls.at(-1).options.disposition, /filename\*=UTF-8''photo.txt.jpg$/);
+
+  const preview = await ctx.access(ctx.imageId, 'preview');
+  assert.equal(preview.statusCode, 200);
+  assert.equal(ctx.calls.at(-1).options.disposition, 'inline');
+  assert.equal(ctx.calls.at(-1).options.mime, 'image/jpeg');
+
+  image.name = 'index.html'; image.mime = 'text/html';
+  const unsafe = await ctx.access();
+  assert.equal(unsafe.statusCode, 200);
+  assert.equal(unsafe.json().mime, 'application/octet-stream');
+  assert.equal(ctx.calls.at(-1).options.mime, 'application/octet-stream');
+  assert.match(ctx.calls.at(-1).options.disposition, /filename\*=UTF-8''index.html$/);
+});
+
+test('download filename handles encoded punctuation, MIME suffixes and unsafe types', () => {
+  const png = downloadResponse('旅途.PNG', 'image/png');
+  assert.match(png.disposition, /filename\*=UTF-8''%E6%97%85%E9%80%94.PNG$/);
+  assert.equal(png.mime, 'image/png');
+  const quoted = downloadResponse('2026\r\n旅途\'照"片', 'image/webp');
+  assert.ok(!/[\r\n]/.test(quoted.disposition));
+  assert.match(quoted.disposition, /filename\*=UTF-8''2026__%E6%97%85%E9%80%94%27%E7%85%A7%22%E7%89%87.webp$/);
+  const unsafe = downloadResponse('index.html', 'text/html');
+  assert.equal(unsafe.mime, 'application/octet-stream');
+  assert.match(unsafe.disposition, /filename\*=UTF-8''index.html$/);
 });
 
 test('unshareable unsafe preview, time limit and ownership on edits', async (t) => {

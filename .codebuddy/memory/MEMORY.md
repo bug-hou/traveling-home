@@ -33,7 +33,7 @@
 - 部署方式：Lighthouse 集成上传后端源码，预装依赖并跑测试，备份后切换并验证服务健康；保留可回滚目录。2026-10-28 最新后端 `/opt/movehome/api` 为含首页汇总、签名缩略图（`COS_IMAGE_PROCESSING_ENABLED` 默认 false）、分享及公开用户名路由的版本，切换前版本在 `/opt/movehome/api-previous-20261028-home`；本地和服务器 29/29 测试通过，线上 `/health` 200、匿名首页/节点/分享/上传路由 401。当前 CORS Origins 仅 `https://convenience.top`、`https://api.convenience.top`；COS 对后一来源 PUT 预检 200，真实浏览器上传/签名图片仍需用户验收。已有配置备份、旧版本与 nginx 备份保留。Lighthouse 前端旧版 `https://api.convenience.top/app/` 仍可用，新版前端由用户在 Makers 发布：构建根目录 `apps/web`、输出 `dist`、命令 `VITE_APP_BASE=/ npm run build`、安装 `npm ci`、Node 22，建议用 `app.convenience.top` 自定义域名保持与 `api.convenience.top` 同站点以支持 SameSite=Lax Cookie；确定域名后还需加到后端 CORS_ORIGINS 和 COS CORS。COS 子账号历史上读取桶 CORS 返回 403，不要假设能用现有凭据修改桶策略。
 
 ## 用户偏好/约定
-- 2026-10-28 用户喜欢 `usehook.cn` 的简约风格，已要求迹光既有设计稿整体参考这种白底、大留白、细边框、低饱和点缀的视觉语言；保留迹光旅行主题，不照搬 useHook 页面。当前只改设计稿，正式 `apps/web` 需待用户明确确认后再落地。
+- 2026-10-28 用户喜欢 `usehook.cn` 的简约风格，要求迹光设计稿与正式 `apps/web` 都参考白底、大留白、细边框、低饱和点缀，保留迹光旅行主题，不照搬 useHook 页面；已明确确认落地正式页面，本地代码已完成，是否发布需另行要求。
 - 前端页面设计与开发希望优先评估并复用已选的 Arco Design 通用控件（选择器、菜单、弹窗、表单等），再做品牌视觉定制；特色业务组件可自定义，但需说明不用组件库的原因。2026-10-28 用户指出已安装 Arco 却未在正式页面落地，建议通过项目规则固化；尚未修改规则文件。
 - 不确定时先向用户确认；用户在聊天里发过明文密钥，已多次建议轮换（待办：COS 子用户密钥与 WebServiceAPI Key 轮换）。
 - 腾讯位置：server-key（WebServiceAPI，应绑服务器 IP）仅后端；web-key（公开，前端地图，需白名单 convenience.top）。

@@ -341,3 +341,57 @@ test('file access signs the custom domain for the owner only', async (t) => {
   const deleted = await app.inject({ method: 'GET', url: endpoint, headers: { 'x-test-user': String(owner) } });
   assert.equal(deleted.statusCode, 404);
 });
+
+test('file locations are owner-only, validated, replaceable and never exposed in node summaries', async (t) => {
+  const { app, db } = await createApp();
+  t.after(() => app.close());
+  const owner = new ObjectId();
+  const other = new ObjectId();
+  const id = new ObjectId();
+  const pendingId = new ObjectId();
+  const folder = await createFolder(app, owner, 'trip');
+  const nodes = db.collection('nodes');
+  await nodes.insertOne({ _id: id, userId: owner, parentId: null, type: 'file', status: 'ready', deletedAt: null, name: 'photo.jpg' });
+  await nodes.insertOne({ _id: pendingId, userId: owner, type: 'file', status: 'pending', deletedAt: null, name: 'pending.jpg' });
+  const url = `/api/v1/nodes/${id}/location`;
+  const headers = { 'x-test-user': String(owner) };
+  const read = (endpoint = url, user = owner) => app.inject({ method: 'GET', url: endpoint, headers: { 'x-test-user': String(user) } });
+  const write = (payload, endpoint = url, user = owner) => app.inject({ method: 'PATCH', url: endpoint, headers: { 'x-test-user': String(user) }, payload });
+
+  assert.equal((await app.inject({ method: 'GET', url })).statusCode, 401);
+  assert.equal((await app.inject({ method: 'PATCH', url, payload: { latitude: 0, longitude: 0 } })).statusCode, 401);
+  assert.equal((await read(url, other)).statusCode, 404);
+  assert.equal((await write({ latitude: 0, longitude: 0 }, url, other)).statusCode, 404);
+  assert.equal((await read(`/api/v1/nodes/${folder.id}/location`)).statusCode, 404);
+  assert.equal((await read(`/api/v1/nodes/${pendingId}/location`)).statusCode, 404);
+  assert.equal((await write({ latitude: 0, longitude: 0 }, `/api/v1/nodes/${pendingId}/location`)).statusCode, 404);
+  assert.equal((await read('/api/v1/nodes/not-an-id/location')).statusCode, 400);
+
+  const empty = await read();
+  assert.equal(empty.statusCode, 200);
+  assert.equal(empty.headers['cache-control'], 'private, no-store');
+  assert.deepEqual(empty.json(), { location: null });
+  const written = await write({ latitude: 0, longitude: -180, placeName: '  旅途  ' });
+  assert.equal(written.statusCode, 200, written.body);
+  assert.equal(written.headers['cache-control'], 'private, no-store');
+  assert.deepEqual(written.json().location, { latitude: 0, longitude: -180, placeName: '旅途', source: 'manual' });
+  assert.deepEqual((await read()).json().location, written.json().location);
+  assert.equal((await write({ latitude: 90, longitude: 180 })).json().location.placeName, null);
+  const detail = await app.inject({ method: 'GET', url: `/api/v1/nodes/${id}`, headers });
+  assert.equal(JSON.stringify(detail.json()).includes('mediaLocation'), false);
+  const list = await app.inject({ method: 'GET', url: '/api/v1/nodes', headers });
+  assert.equal(JSON.stringify(list.json()).includes('mediaLocation'), false);
+
+  for (const payload of [
+    { latitude: '1', longitude: 1 }, { latitude: 91, longitude: 1 }, { latitude: 1, longitude: 181 },
+    { latitude: 1 }, { longitude: 1 }, { latitude: 1, longitude: 1, userId: String(owner) },
+    { latitude: 1, longitude: 1, placeName: '  ' }, { latitude: 1, longitude: 1, placeName: 'a\n' },
+  ]) {
+    const invalid = await write(payload);
+    assert.equal(invalid.statusCode, 400, JSON.stringify(payload));
+    assert.equal(invalid.json().error.code, 'INVALID_INPUT');
+  }
+  await nodes.updateOne({ _id: id }, { $set: { deletedAt: new Date() } });
+  assert.equal((await read()).statusCode, 404);
+  assert.equal((await write({ latitude: 1, longitude: 1 })).statusCode, 404);
+});

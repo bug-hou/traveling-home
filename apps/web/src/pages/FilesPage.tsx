@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Dropdown, Menu, Modal, Select } from '@arco-design/web-react';
+import { Dropdown, Input, Menu, Modal, Select } from '@arco-design/web-react';
 import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { nodesApi } from '@/services/nodes';
-import type { NodeAccess, NodeSort, NodeSummary } from '@/services/nodes';
+import type { NodeSort, NodeSummary } from '@/services/nodes';
 import '@/styles/files.css';
 
 type Action = { kind: 'create' | 'rename' | 'move' | 'delete'; node?: NodeSummary };
@@ -157,13 +157,9 @@ export default function FilesPage() {
   const [targetOffset, setTargetOffset] = useState(0);
   const [targetTotal, setTargetTotal] = useState(0);
   const [targetLoading, setTargetLoading] = useState(false);
-  const [preview, setPreview] = useState<NodeSummary | null>(null);
-  const [access, setAccess] = useState<NodeAccess | null>(null);
-  const [previewError, setPreviewError] = useState('');
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [dragOver, setDragOver] = useState<string | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const currentFolder = folderId ?? null;
   const target = targetPath[targetPath.length - 1];
@@ -215,18 +211,6 @@ export default function FilesPage() {
   }, [action?.kind, target.id, targetOffset, reload]);
 
   useEffect(() => {
-    if (!preview) return;
-    let active = true;
-    setPreviewLoading(true);
-    setPreviewError('');
-    setAccess(null);
-    nodesApi.access(preview.id, 'preview').then((result) => { if (active) setAccess(result); })
-      .catch((cause: unknown) => { if (active) setPreviewError(message(cause)); })
-      .finally(() => { if (active) setPreviewLoading(false); });
-    return () => { active = false; };
-  }, [preview]);
-
-  useEffect(() => {
     function onSearchShortcut(event: KeyboardEvent) {
       if (!document.querySelector('.files-app [role="dialog"]') && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
@@ -238,12 +222,12 @@ export default function FilesPage() {
   }, []);
 
   useEffect(() => {
-    if (action || preview || !returnFocusRef.current) return;
+    if (action || !returnFocusRef.current) return;
     const control = returnFocusRef.current;
     returnFocusRef.current = null;
     if (control.isConnected) control.focus();
     else searchRef.current?.focus();
-  }, [action, preview]);
+  }, [action]);
 
   function openAction(next: Action) {
     returnFocusRef.current = next.node
@@ -256,11 +240,6 @@ export default function FilesPage() {
     setTargetOffset(0);
     setFolders([]);
     setAction(next);
-  }
-
-  function openPreview(node: NodeSummary) {
-    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    setPreview(node);
   }
 
   function refresh() { setOffset(0); setReload((value) => value + 1); }
@@ -312,17 +291,6 @@ export default function FilesPage() {
     };
   }
 
-  function download() {
-    if (!preview) return;
-    void nodesApi.access(preview.id, 'download').then((result) => {
-      const link = document.createElement('a');
-      link.href = result.url;
-      link.rel = 'noreferrer noopener';
-      link.target = '_blank';
-      link.click();
-    }).catch((cause: unknown) => setPreviewError(message(cause)));
-  }
-
   return <div className="files-app">
     <aside className="files-sidebar" aria-label="主导航" data-agent-region="files.nav">
       <Link to="/" className="files-brand" data-agent-id="nav.home.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" />迹光</Link>
@@ -339,7 +307,7 @@ export default function FilesPage() {
         <section className="files-section-heading" data-agent-region="files.breadcrumbs"><div><nav aria-label="文件夹路径">{path.map((entry, index) => <span key={entry.id ?? 'root'}>{index > 0 && ' / '}{index === path.length - 1 ? <strong>{entry.name}</strong> : <Link to={entry.id ? `/files/${entry.id}` : '/files'} data-agent-id={`files.path.${entry.id ?? 'root'}`} {...dropProps(entry.id)}>{entry.name}</Link>}</span>)}</nav><h2>{query ? '搜索结果' : path[path.length - 1]?.name === '全部文件' ? '我的文件' : path[path.length - 1]?.name}</h2><small>{query ? '按文件名搜索所有目录' : '当前目录'}</small></div><button type="button" data-agent-id="files.toolbar.createFolder" onClick={() => openAction({ kind: 'create' })}>＋ 新建文件夹</button></section>
         <section className="files-library" aria-label="文件管理" data-agent-region="files.library">
           <div className="files-toolbar" data-agent-region="files.toolbar">
-            <label className="files-search"><span aria-hidden="true">⌕</span><input ref={searchRef} type="search" value={input} onChange={(event) => setInput(event.target.value)} placeholder="搜索文件或文件夹名称" aria-label="搜索文件或文件夹名称" data-agent-id="files.toolbar.search" /><kbd>⌘ K</kbd></label>
+            <label className="files-search"><Input.Search ref={(instance) => { searchRef.current = instance?.dom ?? null; }} className="files-search-input" type="search" value={input} onChange={setInput} prefix={<span aria-hidden="true">⌕</span>} suffix={null} placeholder="搜索文件或文件夹名称" aria-label="搜索文件或文件夹名称" data-agent-id="files.toolbar.search" /><kbd>⌘ K</kbd></label>
             <div className="files-toolbar-end"><label id="files-sort-label" htmlFor="files-sort">排序</label><Select id="files-sort" className="files-sort" size="large" value={sort} showSearch={false} onChange={(value: NodeSort) => setSort(value)} disabled={Boolean(query)} aria-labelledby="files-sort-label" data-agent-id="files.toolbar.sort" getPopupContainer={getFilesPopupContainer} dropdownMenuClassName="files-sort-menu" dropdownRender={(menu) => <div data-agent-region="files.toolbar.sortOptions">{menu}</div>}>
               {SORT_OPTIONS.map((option) => <Select.Option key={option.value} value={option.value} data-agent-id={`files.toolbar.sortOption.${option.value}`}>{option.label}</Select.Option>)}
             </Select><div className="files-view-toggle" role="group" aria-label="视图切换"><button type="button" data-agent-id="files.toolbar.grid" data-agent-label="网格视图" aria-label="网格视图" aria-pressed={view === 'grid'} onClick={() => setView('grid')}>▦</button><button type="button" data-agent-id="files.toolbar.list" data-agent-label="列表视图" aria-label="列表视图" aria-pressed={view === 'list'} onClick={() => setView('list')}>☷</button></div></div>
@@ -347,7 +315,7 @@ export default function FilesPage() {
           <div className="files-count" role="status">{loading && offset === 0 ? '正在加载…' : error ? '加载失败' : query ? `搜索「${query}」 · ${total} 项（按名称排序）` : `当前目录 · ${total} 项`}</div>
           {error && <div className="files-error" role="alert">{error}<button type="button" data-agent-id="files.library.retry" onClick={refresh}>重试</button><Link to="/files" data-agent-id="files.library.goRoot">回到根目录</Link></div>}
           {!error && items.length > 0 && <><div className={`files-items ${view === 'grid' ? 'files-items--grid' : 'files-items--list'}`}>{items.map((node) => <article key={node.id} className={`files-card ${dragOver === node.id ? 'files-card--drag' : ''}`} draggable onDragStart={(event) => { event.dataTransfer.setData('application/x-movehome-node', node.id); event.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDragOver(null)} {...(node.type === 'folder' ? dropProps(node.id) : {})} data-agent-region={`files.row.${node.id}`}>
-            <button type="button" className="files-card-main" data-agent-id={`files.row.${node.id}.open`} onClick={() => node.type === 'folder' ? navigate(`/files/${node.id}`) : openPreview(node)}>{node.type === 'file' && node.status === 'ready' && CARD_IMAGE_MIMES.has(node.mime?.toLowerCase() ?? '') && node.size > 0 && node.size <= CARD_IMAGE_THUMBNAIL_MAX_BYTES ? <FileThumbnail node={node} /> : <span className={`files-thumb files-thumb--${kind(node)}`}><span aria-hidden="true">{node.type === 'folder' ? '▤' : kind(node) === '视频' ? '▶' : kind(node) === '音频' ? '♫' : '▧'}</span><small>{kind(node)}</small></span>}<span className="files-card-copy"><b title={node.name}>{node.name}</b><small>{node.type === 'folder' ? '文件夹 · 点击打开' : `${formatSize(node.size)} · ${new Date(node.uploadedAt || node.updatedAt).toLocaleDateString('zh-CN')}`}</small></span>{view === 'list' && <span className="files-list-size">{node.type === 'folder' ? '—' : formatSize(node.size)}</span>}</button>
+            <button type="button" className="files-card-main" data-agent-id={`files.row.${node.id}.open`} onClick={() => navigate(node.type === 'folder' ? `/files/${node.id}` : `/preview/${node.id}`)}>{node.type === 'file' && node.status === 'ready' && CARD_IMAGE_MIMES.has(node.mime?.toLowerCase() ?? '') && node.size > 0 && node.size <= CARD_IMAGE_THUMBNAIL_MAX_BYTES ? <FileThumbnail node={node} /> : <span className={`files-thumb files-thumb--${kind(node)}`}><span aria-hidden="true">{node.type === 'folder' ? '▤' : kind(node) === '视频' ? '▶' : kind(node) === '音频' ? '♫' : '▧'}</span><small>{kind(node)}</small></span>}<span className="files-card-copy"><b title={node.name}>{node.name}</b><small>{node.type === 'folder' ? '文件夹 · 点击打开' : `${formatSize(node.size)} · ${new Date(node.uploadedAt || node.updatedAt).toLocaleDateString('zh-CN')}`}</small></span>{view === 'list' && <span className="files-list-size">{node.type === 'folder' ? '—' : formatSize(node.size)}</span>}</button>
             <Dropdown trigger="click" position="br" popupVisible={menuId === node.id} onVisibleChange={(visible) => setMenuId(visible ? node.id : null)} getPopupContainer={getFilesPopupContainer} droplist={
               <Menu className="files-action-menu" data-agent-region={`files.row.${node.id}.menu`} onClickMenuItem={(key) => {
                 if (key === 'share') { setMenuId(null); navigate(`/shares/new?targetId=${node.id}`); }
@@ -381,28 +349,13 @@ export default function FilesPage() {
       <button type="button" className="files-dialog-close" aria-label="关闭对话框" data-agent-id="files.dialog.close" data-agent-label="关闭对话框" disabled={busy} onClick={() => setAction(null)}>×</button>
       <form onSubmit={(event) => void submit(event)}>
         <div className="files-modal-content">
-          {(action.kind === 'create' || action.kind === 'rename') && <label>名称<input autoFocus value={name} maxLength={255} onChange={(event) => setName(event.target.value)} data-agent-id="files.dialog.name" /></label>}
+          {(action.kind === 'create' || action.kind === 'rename') && <label>名称<Input autoFocus value={name} maxLength={255} onChange={setName} data-agent-id="files.dialog.name" /></label>}
           {action.kind === 'delete' && <p>将「{action.node?.name}」移入回收站？{action.node?.type === 'folder' ? '其内部所有文件也会一起移入。' : ''}</p>}
           {action.kind === 'move' && <><p>将「{action.node?.name}」移动到：</p><div className="files-target-path">{targetPath.map((entry, index) => <button type="button" key={entry.id ?? 'root'} data-agent-id={`files.dialog.path.${entry.id ?? 'root'}`} onClick={() => { setTargetPath(targetPath.slice(0, index + 1)); setFolders([]); setTargetOffset(0); }}>{entry.name}</button>)}</div><div className="files-target-list">{targetLoading && <p>加载中…</p>}{folders.filter((folder) => folder.id !== action.node?.id).map((folder) => <button type="button" key={folder.id} data-agent-id={`files.dialog.folder.${folder.id}`} onClick={() => { setTargetPath([...targetPath, { id: folder.id, name: folder.name }]); setFolders([]); setTargetOffset(0); }}>▤ {folder.name} →</button>)}{!targetLoading && targetOffset + 100 < targetTotal && <button type="button" data-agent-id="files.dialog.loadMore" onClick={() => setTargetOffset((value) => value + 100)}>加载更多</button>}</div></>}
           {actionError && <p className="files-action-error" role="alert">{actionError}</p>}
         </div>
         <div className="files-dialog-footer"><button type="button" data-agent-id="files.dialog.cancel" disabled={busy} onClick={() => setAction(null)}>取消</button><button type="submit" disabled={busy} className={action.kind === 'delete' ? 'danger' : 'primary'} data-agent-id="files.dialog.submit" data-agent-danger={action.kind === 'delete' ? 'true' : undefined}>{busy ? '处理中…' : action.kind === 'delete' ? '确认移入回收站' : action.kind === 'create' ? '创建' : action.kind === 'rename' ? '保存' : '确认移动'}</button></div>
       </form>
-    </Modal>}
-    {preview && <Modal
-      visible
-      className="files-arco-modal files-arco-modal--preview"
-      getPopupContainer={getFilesPopupContainer}
-      data-agent-region="files.preview"
-      title={<div className="files-dialog-heading"><span>私有素材 · 短时链接</span><h2>{preview.name}</h2></div>}
-      closable={false}
-      footer={null}
-      maskClosable={false}
-      onCancel={() => { setPreview(null); setAccess(null); }}
-    >
-      <button type="button" className="files-dialog-close" aria-label="关闭预览" data-agent-id="files.preview.close" data-agent-label="关闭预览" onClick={() => { setPreview(null); setAccess(null); }}>×</button>
-      <div className="files-preview-body" data-agent-ignore="true">{previewLoading && <p>正在获取私有访问链接…</p>}{previewError && <p role="alert">{previewError}</p>}{access && (access.previewable ? access.mime.startsWith('image/') ? <img src={access.url} alt={preview.name} referrerPolicy="no-referrer" onError={() => setPreviewError('图片无法加载，请尝试下载原文件')} /> : access.mime.startsWith('video/') ? <video src={access.url} controls controlsList="nodownload" onError={() => setPreviewError('该视频暂无法在线播放，请下载原片')} /> : access.mime.startsWith('audio/') ? <audio src={access.url} controls controlsList="nodownload" onError={() => setPreviewError('音频无法播放，请下载原文件')} /> : null : <p>当前格式不支持在线预览，可以下载原文件。</p>)}</div>
-      <div className="files-dialog-footer files-dialog-footer--preview"><span>{formatSize(preview.size)} · {kind(preview)}</span><button type="button" data-agent-id="files.preview.download" onClick={download}>下载原文件</button></div>
     </Modal>}
     {notice && <p className="files-toast" role="status">{notice}</p>}
   </div>;

@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { fail, parseBody } from '../lib/http.js';
+import { downloadResponse } from '../services/cos.js';
 
 const nodeIdSchema = z.string().regex(/^[a-f\d]{24}$/i, '节点 ID 格式不正确');
 const nodeNameSchema = z
@@ -40,6 +41,11 @@ const listQuerySchema = z
   })
   .strict();
 
+const locationBodySchema = z.object({
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  placeName: z.string().max(100).refine((value) => !/[\x00-\x1f\x7f]/.test(value)).transform((value) => value.trim()).pipe(z.string().min(1).max(60)).nullable().optional(),
+}).strict();
 const readUrlQuerySchema = z.object({ purpose: z.enum(['preview', 'download', 'thumbnail']).default('preview') }).strict();
 const INLINE_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav']);
 const THUMBNAIL_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
@@ -237,6 +243,30 @@ export default async function nodeRoutes(app, { cfg, db, requireAuth, cos }) {
     return { node: serializeNode(node), ancestors };
   });
 
+  app.get('/nodes/:id/location', { preHandler: requireAuth }, async (req, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    const id = parseNodeId(req.params.id, reply);
+    if (!id) return;
+    const node = await nodes.findOne({ _id: id, userId: req.user._id, type: 'file', status: 'ready', deletedAt: null });
+    if (!node) return fail(reply, 404, 'NODE_NOT_FOUND', '文件不存在');
+    return { location: node.mediaLocation ?? null };
+  });
+
+  app.patch('/nodes/:id/location', { preHandler: requireAuth }, async (req, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    const id = parseNodeId(req.params.id, reply);
+    if (!id) return;
+    const body = parseBody(locationBodySchema, req.body, reply);
+    if (!body) return;
+    const location = { latitude: body.latitude, longitude: body.longitude, placeName: body.placeName ?? null, source: 'manual' };
+    const result = await nodes.updateOne(
+      { _id: id, userId: req.user._id, type: 'file', status: 'ready', deletedAt: null },
+      { $set: { mediaLocation: location, updatedAt: new Date() } },
+    );
+    if (result.matchedCount !== 1) return fail(reply, 404, 'NODE_NOT_FOUND', '文件不存在');
+    return { location };
+  });
+
   app.get('/nodes/:id/url', { preHandler: requireAuth }, async (req, reply) => {
     reply.header('Cache-Control', 'private, no-store');
     const id = parseNodeId(req.params.id, reply);
@@ -258,10 +288,10 @@ export default async function nodeRoutes(app, { cfg, db, requireAuth, cos }) {
     }
     const mime = thumbnail ? 'image/jpeg' : INLINE_MIME.has(node.mime?.toLowerCase()) ? node.mime.toLowerCase() : 'application/octet-stream';
     const inline = thumbnail || (query.data.purpose === 'preview' && mime !== 'application/octet-stream');
-    const disposition = inline ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(node.name ?? 'download')}`;
+    const response = inline ? { disposition: 'inline', mime } : downloadResponse(node.name, mime);
     try {
-      const url = await cos.signReadUrl(node.cosKey, { disposition, mime, ...(thumbnail ? { thumbnail: true } : {}) });
-      return { url, expiresAt: new Date(Date.now() + 600_000), name: node.name, mime, previewable: inline };
+      const url = await cos.signReadUrl(node.cosKey, { ...response, ...(thumbnail ? { thumbnail: true } : {}) });
+      return { url, expiresAt: new Date(Date.now() + 600_000), name: node.name, mime: response.mime, previewable: inline };
     } catch (error) {
       req.log.error({ err: error, nodeId: String(id) }, 'unable to sign file URL');
       return fail(reply, 503, 'STORAGE_UNAVAILABLE', '文件访问暂不可用');

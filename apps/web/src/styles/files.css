@@ -96,3 +96,11 @@
 @media(max-width:980px){.files-sidebar{width:76px}.files-main{margin-left:76px}.files-content{padding:32px 24px 52px}}
 @media(max-width:700px){.files-sidebar{display:none}.files-main{margin-left:0}.files-topbar{height:57px;padding:0 18px}.files-content{padding:28px 18px 38px}.files-heading h1{font-size:26px}.files-heading p{font-size:12px}.files-upload{min-height:40px;font-size:12px}.files-intro small{font-size:10px}.files-mobile-nav{border-color:var(--j-line);background:#ffffffed}.files-mobile-nav a{color:#7b857e;font-size:19px}.files-mobile-nav a[aria-current=page]{color:#326a51}.files-mobile-nav small{font-size:10px}.files-search input{font-size:16px}}
 @media(max-width:370px){.files-content{padding-right:14px;padding-left:14px}.files-card-copy b{font-size:12px}}
+.files-search { min-width: 0; transition: border-color .18s, box-shadow .18s; }
+.files-search:focus-within { border-color: var(--j-accent); box-shadow: 0 0 0 3px rgb(38 125 112 / 12%); }
+.files-search .arco-input-group-wrapper { min-width: 0; flex: 1; width: 100%; background: transparent; }
+.files-search .arco-input-inner-wrapper, .files-search .arco-input-inner-wrapper:hover, .files-search .arco-input-inner-wrapper-focus { height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.files-search .arco-input-group-prefix { padding: 0 8px 0 0; background: transparent; color: #87988d; font-size: 20px; }
+.files-search .arco-input { min-width: 0; height: 100%; padding: 0; border: 0; background: transparent; }
+.files-app .files-search input:focus-visible { outline: none; }
+.files-modal-content .arco-input { width: 100%; border-radius: 7px; }

@@ -1,4 +1,3 @@
-import { Modal } from '@arco-design/web-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,13 +6,11 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import { homeApi } from '@/services/home';
 import type { HomeSummary, ModuleStatus, RecentFile } from '@/services/home';
 import { nodesApi } from '@/services/nodes';
-import type { NodeAccess } from '@/services/nodes';
 import '@/styles/home.css';
 
 const PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const SMALL_IMAGE = 2 * 1024 * 1024;
 const MAX_IMAGE = 30 * 1024 * 1024;
-const getHomePopupContainer = () => document.querySelector('.home-page') ?? document.body;
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -74,9 +71,6 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const [search, setSearch] = useState('');
-  const [preview, setPreview] = useState<RecentFile | null>(null);
-  const [access, setAccess] = useState<NodeAccess | null>(null);
-  const [previewError, setPreviewError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -86,34 +80,12 @@ export default function HomePage() {
     return () => { active = false; };
   }, [revision]);
 
-  useEffect(() => {
-    if (!preview) return;
-    let active = true;
-    setAccess(null);
-    setPreviewError('');
-    nodesApi.access(preview.id, 'preview').then((result) => { if (active) setAccess(result); })
-      .catch((cause: unknown) => { if (active) setPreviewError(cause instanceof Error ? cause.message : '无法获取预览链接'); });
-    return () => { active = false; };
-  }, [preview]);
-
   function searchFiles(event: FormEvent) {
     event.preventDefault();
     if (search.trim()) navigate(`/files?${new URLSearchParams({ q: search.trim().slice(0, 100) })}`);
   }
 
   function retry() { setLoading(true); setRevision((value) => value + 1); }
-  function closePreview() { setPreview(null); setAccess(null); }
-  async function download() {
-    if (!preview) return;
-    try {
-      const signed = await nodesApi.access(preview.id, 'download');
-      const anchor = document.createElement('a');
-      anchor.href = signed.url;
-      anchor.target = '_blank';
-      anchor.rel = 'noopener noreferrer';
-      anchor.click();
-    } catch (cause) { setPreviewError(cause instanceof Error ? cause.message : '下载暂不可用'); }
-  }
 
   const now = new Date();
   const greeting = now.getHours() < 11 ? '早上好' : now.getHours() < 18 ? '下午好' : '晚上好';
@@ -151,13 +123,12 @@ export default function HomePage() {
         <div className="home-content-grid">
           <section className="home-panel home-footprint" data-agent-region="home.footprint"><div className="home-panel-heading"><div><small>MY FOOTPRINT</small><h2>我的足迹</h2></div><span>准备中</span></div><div className="home-placeholder"><span aria-hidden="true">⌖</span><strong>你的足迹地图，等第一枚坐标</strong><p>位置解析和县级归属仍在建设中，暂不会把素材统计为已点亮地区。</p></div></section>
           <section className="home-panel home-space" data-agent-region="home.storage"><div className="home-panel-heading"><div><small>YOUR CLOUD</small><h2>云端空间</h2></div></div>{storage?.status === 'ready' || storage?.status === 'empty' ? <div className="home-space-details"><div className="home-space-ring"><strong>{formatBytes(storage.usedBytes ?? 0)}</strong><small>已用空间</small></div><p>未设置空间配额；仅统计已入库且未删除的文件。</p><div className="home-breakdown">{([['视频', storage.breakdown?.videoBytes], ['图片', storage.breakdown?.imageBytes], ['音频', storage.breakdown?.audioBytes], ['其他', storage.breakdown?.otherBytes]] as const).map(([label, value]) => <div key={label}><span>{label}</span><b>{formatBytes(value ?? 0)}</b></div>)}</div><Link to="/files" data-agent-id="home.storage.viewFiles">查看全部文件 →</Link></div> : <div className="home-placeholder"><span aria-hidden="true">◉</span><strong>{storage?.status === 'unavailable' ? '空间数据暂不可用' : '空间情况即将呈现'}</strong><p>上传后，这里会显示已使用空间和素材类型。</p></div>}</section>
-          <section className="home-panel home-recents" data-agent-region="home.recentFiles"><div className="home-panel-heading"><div><small>RECENTLY ADDED</small><h2>最近素材</h2></div><Link to="/files" data-agent-id="home.recentFiles.all">全部素材 →</Link></div>{files?.status === 'ready' && files.recent.length ? <div className="home-media-grid">{files.recent.map((file) => <button type="button" className="home-media-card" key={file.id} data-agent-id={`home.recentFiles.open.${file.id}`} onClick={() => setPreview(file)}><RecentImage file={file} /><b title={file.name}>{file.name}</b><small>{file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString('zh-CN') : '上传日期未知'} · {formatBytes(file.size)}</small></button>)}</div> : <div className="home-placeholder"><span aria-hidden="true">▤</span><strong>{files?.status === 'unavailable' ? '最近素材暂不可用' : files?.status === 'not_ready' ? '最近素材准备中' : '最近素材会出现在这里'}</strong><p>已上传的照片、视频和音频可以从这里继续浏览。</p></div>}</section>
+          <section className="home-panel home-recents" data-agent-region="home.recentFiles"><div className="home-panel-heading"><div><small>RECENTLY ADDED</small><h2>最近素材</h2></div><Link to="/files" data-agent-id="home.recentFiles.all">全部素材 →</Link></div>{files?.status === 'ready' && files.recent.length ? <div className="home-media-grid">{files.recent.map((file) => <button type="button" className="home-media-card" key={file.id} data-agent-id={`home.recentFiles.open.${file.id}`} onClick={() => navigate(`/preview/${file.id}`)}><RecentImage file={file} /><b title={file.name}>{file.name}</b><small>{file.uploadedAt ? new Date(file.uploadedAt).toLocaleDateString('zh-CN') : '上传日期未知'} · {formatBytes(file.size)}</small></button>)}</div> : <div className="home-placeholder"><span aria-hidden="true">▤</span><strong>{files?.status === 'unavailable' ? '最近素材暂不可用' : files?.status === 'not_ready' ? '最近素材准备中' : '最近素材会出现在这里'}</strong><p>已上传的照片、视频和音频可以从这里继续浏览。</p></div>}</section>
           <section className="home-panel home-trips" data-agent-region="home.recentTrips"><div className="home-panel-heading"><div><small>YOUR JOURNEYS</small><h2>最近旅行</h2></div><span>准备中</span></div><div className="home-placeholder"><span aria-hidden="true">▦</span><strong>下一段旅行，等你出发</strong><p>旅行记录能力尚未接通，暂不展示示例旅程。</p></div></section>
         </div>
         <footer className="home-footer">每一段旅程，都会成为你自己的地图。 <span>数据仅存于你的私人空间</span></footer>
       </div>
     </main>
     <WorkspaceMobileNavigation className="home-mobile-nav" region="home.nav" />
-    {preview && <Modal visible className="home-preview-modal" getPopupContainer={getHomePopupContainer} data-agent-region="home.preview" title={preview.name} closable={false} footer={null} maskClosable={false} onCancel={closePreview}><button type="button" className="home-preview-close" aria-label="关闭预览" data-agent-id="home.preview.close" onClick={closePreview}>×</button><div className="home-preview-body" data-agent-ignore="true">{previewError && <p role="alert">{previewError}</p>}{!access && !previewError && <p>正在获取私有访问链接…</p>}{access && (access.previewable ? access.mime.startsWith('image/') ? <img src={access.url} alt={preview.name} referrerPolicy="no-referrer" onError={() => setPreviewError('图片无法加载，请下载原文件')} /> : access.mime.startsWith('video/') ? <video src={access.url} controls onError={() => setPreviewError('视频暂无法播放，请下载原文件')} /> : access.mime.startsWith('audio/') ? <audio src={access.url} controls onError={() => setPreviewError('音频暂无法播放，请下载原文件')} /> : null : <p>当前格式不支持在线预览，可以下载原文件。</p>)}</div><div className="home-preview-actions"><span>{formatBytes(preview.size)} · {fileKind(preview)}</span><button type="button" data-agent-id="home.preview.download" onClick={() => void download()}>下载原文件</button></div></Modal>}
   </div>;
 }
