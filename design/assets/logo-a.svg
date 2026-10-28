@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="光点">
+  <defs>
+    <linearGradient id="pin-bg" x1="6" y1="2" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset=".5" stop-color="#0D9488"/>
+      <stop offset="1" stop-color="#0E7490"/>
+    </linearGradient>
+    <linearGradient id="pin-shine" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".28"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#pin-bg)"/>
+  <rect width="64" height="64" rx="18" fill="url(#pin-shine)"/>
+  <path fill="#fff" fill-rule="evenodd" d="M30 13a15 15 0 0 0-15 15c0 10.8 15 24 15 24s15-13.2 15-24A15 15 0 0 0 30 13zm0 21a6 6 0 1 1 0-12 6 6 0 0 1 0 12z"/>
+  <g stroke="#CCFBF1" stroke-width="3.2" stroke-linecap="round" fill="none">
+    <path d="M43.1 14.9l3.2-3.2M47.9 23.2l4.4-1.2M34.8 10.1l1.2-4.3"/>
+  </g>
+</svg>

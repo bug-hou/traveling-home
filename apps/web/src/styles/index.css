@@ -1,0 +1,23 @@
+/* 层顺序：Arco 样式放在 components 层，Tailwind 工具类放在 utilities 层，
+   这样 className="mt-4" 这类工具类可以正常覆盖 Arco 组件的默认样式。
+   不引入 Tailwind 的 preflight，避免与 Arco 的基础样式冲突。 */
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import '@arco-design/web-react/dist/css/arco.css' layer(components);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+}

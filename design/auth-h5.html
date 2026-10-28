@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>登录 / 注册 · H5 · 迹光 设计稿</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/auth.css" />
+</head>
+<body>
+<div class="stage h5" data-view="login" data-state="default">
+  <main class="h5-wrap">
+    <div class="phone">
+      <div class="statusbar" aria-hidden="true"><span>9:41</span><span>5G ▮▮▮</span></div>
+
+      <header class="h5-hero">
+        <div class="fl fl-a" aria-hidden="true"><img src="assets/art-photo.svg" alt="" /></div>
+        <div class="fl fl-b" aria-hidden="true"><img src="assets/art-map-light.svg" alt="" /></div>
+        <div class="fl fl-c" aria-hidden="true"><svg class="i"><use href="assets/icons.svg#pin"/></svg>已点亮 87 县区</div>
+        <img class="logo-lg" src="assets/logo.svg" alt="迹光" />
+        <h2>迹光</h2>
+        <p>把走过的路，点亮成地图</p>
+      </header>
+
+      <section class="h5-sheet">
+        <div class="tabs" role="tablist">
+          <button class="tab" type="button" role="tab" data-goto="login">登录</button>
+          <button class="tab" type="button" role="tab" data-goto="register">注册</button>
+        </div>
+
+        <!-- ===== 登录 ===== -->
+        <div class="view view-login">
+          <h1 class="title">欢迎回来</h1>
+          <p class="subtitle">登录后继续管理你的旅行素材</p>
+
+          <div class="alerts" role="alert" aria-live="polite">
+            <div class="alert alert--error alert--invalid"><svg class="i"><use href="assets/icons.svg#alert"/></svg><div>邮箱或密码不正确</div></div>
+            <div class="alert alert--warn alert--locked"><svg class="i"><use href="assets/icons.svg#alert"/></svg><div>尝试次数过多，请稍后再试<small>连续输错 5 次会锁定 15 分钟</small></div></div>
+            <div class="alert alert--error alert--disabled"><svg class="i"><use href="assets/icons.svg#alert"/></svg><div>账号已被停用</div></div>
+            <div class="alert alert--error alert--network"><svg class="i"><use href="assets/icons.svg#alert"/></svg><div>网络不稳定，请检查网络后重试</div></div>
+          </div>
+
+          <form novalidate>
+            <div class="field is-validate">
+              <label for="l-email">邮箱</label>
+              <div class="control">
+                <span class="lead"><svg class="i"><use href="assets/icons.svg#mail"/></svg></span>
+                <input id="l-email" data-field="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" placeholder="name@example.com" />
+              </div>
+              <p class="field-error fe-validate">请输入正确的邮箱地址</p>
+            </div>
+
+            <div class="field is-validate">
+              <label for="l-pwd">密码</label>
+              <div class="control">
+                <span class="lead"><svg class="i"><use href="assets/icons.svg#lock"/></svg></span>
+                <input id="l-pwd" data-field="pwd" type="password" autocomplete="current-password" placeholder="请输入密码" />
+                <button class="eye" type="button" aria-label="显示密码">
+                  <svg class="i ic-on"><use href="assets/icons.svg#eye"/></svg>
+                  <svg class="i ic-off"><use href="assets/icons.svg#eye-off"/></svg>
+                </button>
+              </div>
+              <p class="field-error fe-validate">请输入密码</p>
+            </div>
+
+            <button class="btn btn--primary" type="submit" style="margin-top:20px">
+              <span class="spinner"></span>
+              <span class="t-idle">登 录</span><span class="t-busy">登录中…</span>
+            </button>
+          </form>
+
+          <p class="agree">登录即表示同意 <a href="#">《用户协议》</a> 和 <a href="#">《隐私政策》</a></p>
+        </div>
+
+        <!-- ===== 注册 ===== -->
+        <div class="view view-register">
+          <h1 class="title">创建账号</h1>
+          <p class="subtitle">注册后即可开始上传你的旅行素材</p>
+
+          <div class="alerts" role="alert" aria-live="polite">
+            <div class="alert alert--error alert--network"><svg class="i"><use href="assets/icons.svg#alert"/></svg><div>网络不稳定，请检查网络后重试</div></div>
+          </div>
+
+          <form novalidate>
+            <div class="field">
+              <label for="r-nick">昵称<small>选填</small></label>
+              <div class="control">
+                <span class="lead"><svg class="i"><use href="assets/icons.svg#user"/></svg></span>
+                <input id="r-nick" data-field="nick" type="text" maxlength="30" autocomplete="nickname" placeholder="怎么称呼你" />
+              </div>
+            </div>
+
+            <div class="field is-validate is-taken">
+              <label for="r-email">邮箱</label>
+              <div class="control">
+                <span class="lead"><svg class="i"><use href="assets/icons.svg#mail"/></svg></span>
+                <input id="r-email" data-field="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" placeholder="name@example.com" />
+              </div>
+              <p class="field-error fe-validate">请输入正确的邮箱地址</p>
+              <p class="field-error fe-taken">该邮箱已注册，<a href="#" data-goto="login">直接登录</a></p>
+            </div>
+
+            <div class="field is-validate">
+              <label for="r-pwd">密码</label>
+              <div class="control">
+                <span class="lead"><svg class="i"><use href="assets/icons.svg#lock"/></svg></span>
+                <input id="r-pwd" data-field="pwd" type="password" autocomplete="new-password" placeholder="至少 8 位" />
+                <button class="eye" type="button" aria-label="显示密码">
+                  <svg class="i ic-on"><use href="assets/icons.svg#eye"/></svg>
+                  <svg class="i ic-off"><use href="assets/icons.svg#eye-off"/></svg>
+                </button>
+              </div>
+              <p class="field-error fe-validate">密码至少 8 位</p>
+              <p class="field-hint">8–128 位，建议混合字母与数字</p>
+            </div>
+
+            <button class="btn btn--primary" type="submit" style="margin-top:20px">
+              <span class="spinner"></span>
+              <span class="t-idle">注 册</span><span class="t-busy">注册中…</span>
+            </button>
+          </form>
+
+          <p class="agree">注册即表示同意 <a href="#">《用户协议》</a> 和 <a href="#">《隐私政策》</a></p>
+        </div>
+
+        <!-- ===== 注册已关闭 ===== -->
+        <div class="view view-closed">
+          <div class="closed-ico"><svg class="i"><use href="assets/icons.svg#lock"/></svg></div>
+          <h1 class="title">暂未开放注册</h1>
+          <p class="closed-text">当前仅限受邀使用。如果你已有账号，请直接登录。</p>
+          <button class="btn btn--primary" type="button" data-goto="login"><span>返回登录</span></button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toolbar">
+  <div class="row"><b>页面</b>
+    <button data-set-view="login">登录</button>
+    <button data-set-view="register">注册</button>
+    <button data-set-view="closed">注册已关闭</button>
+  </div>
+  <div class="row"><b>状态</b>
+    <button data-set-state="default" data-for="login register">默认</button>
+    <button data-set-state="field-error" data-for="login register">校验错误</button>
+    <button data-set-state="invalid" data-for="login">账号或密码错误</button>
+    <button data-set-state="locked" data-for="login">已锁定</button>
+    <button data-set-state="disabled" data-for="login">账号停用</button>
+    <button data-set-state="email-taken" data-for="register">邮箱已注册</button>
+    <button data-set-state="network" data-for="login register">网络错误</button>
+    <button data-set-state="loading" data-for="login register">提交中</button>
+  </div>
+</div>
+<script src="assets/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+import { ObjectId } from 'mongodb';
+import { z } from 'zod';
+import { fail, parseBody } from '../lib/http.js';
+
+const MAX_OBJECT_SIZE = 5_000_000_000_000;
+const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const fileNameSchema = z
+  .string()
+  .trim()
+  .min(1, '文件名不能为空')
+  .max(255, '文件名不能超过 255 个字符')
+  .refine((value) => !/[\\/\0]/.test(value) && value !== '.' && value !== '..', {
+    message: '文件名不能包含路径分隔符',
+  });
+const parentIdSchema = z.string().regex(/^[a-f\d]{24}$/i, '文件夹 ID 格式不正确');
+const credentialsBody = z
+  .object({
+    name: fileNameSchema,
+    size: z.number().int().min(0).max(MAX_OBJECT_SIZE),
+    mime: z
+      .string()
+      .trim()
+      .max(255)
+      .regex(/^[a-z\d!#$&^_.+-]+\/[a-z\d!#$&^_.+-]+$/i, 'MIME 类型格式不正确')
+      .optional(),
+    parentId: parentIdSchema.nullable().optional(),
+  })
+  .strict();
+const completeBody = z
+  .object({ uploadId: z.string().regex(/^[a-f\d]{24}$/i, '上传 ID 格式不正确') })
+  .strict();
+
+function extensionFor(name) {
+  const match = name.match(/\.([a-z\d]{1,16})$/i);
+  return match ? `.${match[1].toLowerCase()}` : '';
+}
+
+function getContentLength(head) {
+  const value =
+    head?.headers?.['content-length'] ??
+    head?.headers?.['Content-Length'] ??
+    head?.ContentLength ??
+    head?.contentLength;
+  const size = Number(value);
+  return Number.isSafeInteger(size) && size >= 0 ? size : null;
+}
+
+function isObjectNotFound(error) {
+  return (
+    Number(error?.statusCode) === 404 ||
+    error?.code === 'NoSuchKey' ||
+    error?.code === 'NotFound' ||
+    error?.Code === 'NoSuchKey' ||
+    error?.Code === 'NotFound'
+  );
+}
+
+function serializeFile(node) {
+  return {
+    id: String(node._id),
+    parentId: node.parentId ? String(node.parentId) : null,
+    type: 'file',
+    name: node.name,
+    size: node.size,
+    mime: node.mime,
+    status: node.status,
+    createdAt: node.createdAt,
+    updatedAt: node.updatedAt,
+    uploadedAt: node.uploadedAt,
+    deletedAt: node.deletedAt,
+  };
+}
+
+async function findActiveParent(nodes, userId, parentId) {
+  if (!parentId) return true;
+  const parent = await nodes.findOne({
+    _id: parentId,
+    userId,
+    type: 'folder',
+    deletedAt: null,
+  });
+  return Boolean(parent);
+}
+
+export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
+  const nodes = db.collection('nodes');
+  const sessions = db.collection('upload_sessions');
+
+  app.post('/uploads/credentials', { preHandler: requireAuth }, async (req, reply) => {
+    if (!cfg.cos || !cos) {
+      return fail(reply, 503, 'UPLOADS_NOT_CONFIGURED', '上传服务暂不可用');
+    }
+
+    const body = parseBody(credentialsBody, req.body, reply);
+    if (!body) return;
+
+    const userId = req.user._id;
+    const parentId = body.parentId ? new ObjectId(body.parentId) : null;
+    if (!(await findActiveParent(nodes, userId, parentId))) {
+      return fail(reply, 404, 'PARENT_NOT_FOUND', '目标文件夹不存在');
+    }
+
+    const now = new Date();
+    const uploadId = new ObjectId();
+    const nodeId = new ObjectId();
+    const datePath = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const key = `${cfg.cos.prefix}/users/${userId}/originals/${datePath}/${nodeId}${extensionFor(body.name)}`;
+    const expiresAt = new Date(now.getTime() + UPLOAD_SESSION_TTL_MS);
+    const credentialExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+    const session = {
+      _id: uploadId,
+      userId,
+      nodeId,
+      parentId,
+      name: body.name,
+      expectedSize: body.size,
+      mime: body.mime?.toLowerCase() ?? 'application/octet-stream',
+      cosKey: key,
+      status: 'pending',
+      createdAt: now,
+      expiresAt,
+      credentialExpiresAt,
+    };
+
+    let authorization;
+    try {
+      authorization = await cos.issueUploadCredentials({ key });
+    } catch {
+      return fail(reply, 503, 'UPLOAD_AUTH_UNAVAILABLE', '暂时无法创建上传授权，请稍后重试');
+    }
+
+    try {
+      await sessions.insertOne(session);
+    } catch {
+      return fail(reply, 503, 'UPLOAD_SESSION_UNAVAILABLE', '暂时无法创建上传任务，请稍后重试');
+    }
+
+    reply.header('Cache-Control', 'private, no-store');
+    return reply.code(201).send({
+      uploadId: String(uploadId),
+      fileId: String(nodeId),
+      bucket: cfg.cos.bucket,
+      region: cfg.cos.region,
+      key,
+      credentials: authorization.credentials,
+      expiresAt: authorization.expiresAt,
+    });
+  });
+
+  app.post('/uploads/complete', { preHandler: requireAuth }, async (req, reply) => {
+    const body = parseBody(completeBody, req.body, reply);
+    if (!body) return;
+
+    const userId = req.user._id;
+    const uploadId = new ObjectId(body.uploadId);
+    const session = await sessions.findOne({ _id: uploadId, userId });
+    if (!session) return fail(reply, 404, 'UPLOAD_SESSION_NOT_FOUND', '上传任务不存在或已过期');
+
+    reply.header('Cache-Control', 'private, no-store');
+    if (session.status === 'completed') {
+      const existingNode = await nodes.findOne({
+        _id: session.nodeId,
+        userId,
+        uploadSessionId: session._id,
+      });
+      if (!existingNode) return fail(reply, 500, 'UPLOAD_RECORD_INCONSISTENT', '上传记录暂时无法读取');
+      return { node: serializeFile(existingNode), idempotent: true };
+    }
+
+    if (session.status !== 'pending' || session.expiresAt <= new Date()) {
+      return fail(reply, 410, 'UPLOAD_SESSION_EXPIRED', '上传任务已过期，请重新上传');
+    }
+
+    if (!(await findActiveParent(nodes, userId, session.parentId))) {
+      return fail(reply, 409, 'PARENT_NOT_AVAILABLE', '目标文件夹已不可用，请重新选择位置');
+    }
+
+    let head;
+    try {
+      head = await cos.headObject(session.cosKey);
+    } catch (error) {
+      if (isObjectNotFound(error)) {
+        return fail(reply, 409, 'UPLOAD_OBJECT_NOT_FOUND', '未找到已上传的文件对象');
+      }
+      return fail(reply, 503, 'STORAGE_UNAVAILABLE', '暂时无法校验上传文件，请稍后重试');
+    }
+
+    const actualSize = getContentLength(head);
+    if (actualSize === null) return fail(reply, 502, 'STORAGE_RESPONSE_INVALID', '存储服务返回了无效的文件信息');
+    if (actualSize !== session.expectedSize) {
+      return fail(reply, 409, 'UPLOAD_SIZE_MISMATCH', '上传文件大小与申请上传时不一致');
+    }
+    if (!(await findActiveParent(nodes, userId, session.parentId))) {
+      return fail(reply, 409, 'PARENT_NOT_AVAILABLE', '目标文件夹已不可用，请重新选择位置');
+    }
+
+    const now = new Date();
+    const node = {
+      _id: session.nodeId,
+      userId,
+      parentId: session.parentId,
+      type: 'file',
+      name: session.name,
+      size: actualSize,
+      mime: session.mime,
+      hash: null,
+      cosKey: session.cosKey,
+      status: 'ready',
+      uploadSessionId: session._id,
+      createdAt: now,
+      updatedAt: now,
+      uploadedAt: now,
+      deletedAt: null,
+    };
+
+    let inserted = true;
+    try {
+      await nodes.insertOne(node);
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      inserted = false;
+      const existingNode = await nodes.findOne({
+        _id: session.nodeId,
+        userId,
+        uploadSessionId: session._id,
+      });
+      if (!existingNode) throw error;
+      Object.assign(node, existingNode);
+    }
+
+    await sessions.updateOne(
+      { _id: session._id, userId, status: 'pending' },
+      { $set: { status: 'completed', completedAt: now, updatedAt: now } },
+    );
+
+    return { node: serializeFile(node), idempotent: !inserted };
+  });
+}

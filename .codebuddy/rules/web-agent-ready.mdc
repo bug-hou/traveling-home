@@ -1,0 +1,51 @@
+---
+description: 开发或修改 apps/web 下的前端页面、组件、路由时，必须同时考虑页面 Agent 的可读性与可操作性：编写页面知识文档（pages-knowledge）、给可交互元素加 data-agent-* 埋点、业务动作抽成独立函数。
+globs: apps/web/**
+alwaysApply: false
+---
+
+# 前端页面开发的 Agent 就绪规则
+
+项目计划接入页面 Agent：后端 LLM 决策，浏览器当前标签页内执行（虚拟光标 + 高亮 + 模拟点击）。因此开发每个页面/组件时，必须让 Agent 能"读懂"和"操作"。规范细节以 `apps/web/pages-knowledge/README.md` 为准。
+
+## 每次开发或修改页面时必须完成
+
+1. **页面知识文档**：在 `apps/web/pages-knowledge/` 新建或更新 `{pageId}.md`（按 `_template.md`），并同步页面索引表。与页面代码在同一次改动中完成。
+2. **元素埋点**：所有可交互元素加 `data-agent-id`，按需加 `data-agent-label`、`data-agent-danger`、`data-agent-region`、`data-agent-ignore`。
+3. **业务动作独立成函数**：筛选、搜索、创建、重命名、删除等写进 `stores/` 或 `services/`，UI 回调与 Agent 工具共用同一个函数。
+4. **路由登记**：在路由表中给该页面加 `handle: { agent: { pageId: '...' } }`，`pageId` 必须与知识文档文件名一致。
+5. **文档与代码一致**：知识文档里列出的每个动作，在代码里必须有对应的 `data-agent-id` 或工具函数，反之亦然。
+
+## 埋点要求（摘要）
+
+- **哪些元素要埋**：按钮、链接、输入框、下拉/选择器、开关、复选框、Tab、菜单项、列表行内的操作按钮、弹层中的所有可交互项。纯装饰元素不用埋。
+- **命名**：`页面.区域.动作`，小驼峰、点连接；全局导航 `nav.*`；列表行带业务 ID，如 `files.row.${id}.rename`，禁止用数组下标。
+- **危险操作**（删除、清空、彻底删除、取消分享、覆盖）必须加 `data-agent-danger="true"`。
+- **敏感内容**（密码框、令牌、分享提取码等）必须加 `data-agent-ignore="true"`。
+- **语义化**：用 `button`/`a`/`input`，不用 `div onClick`；图标按钮必须有 `aria-label`；状态用 `aria-pressed/selected/expanded/checked/disabled`。
+- **不要埋坐标或位置**，位置由运行时实时计算。
+- **Arco 复杂组件**（Select、DatePicker、Dropdown、Tabs、Upload 等）首次使用时，要实测 `data-agent-id` 是否落在应被点击的节点上，结论写入 `pages-knowledge/README.md` 的"Arco 组件埋点备忘"；落不到的封装一层。
+- **Portal 弹层**（Modal、Drawer、Dropdown 的浮层）同样要埋点，并给根节点加 `data-agent-region`。
+
+## 没有 DOM 可点的区域
+
+地图（腾讯地图 GL 的 canvas）等不能靠点击驱动。必须提供工具函数（如设置中心点、适配范围、高亮区域、读取已点亮县区），并在对应知识文档的"可执行动作"中列出。
+
+## 后台标签页
+
+标签页在后台时 Agent 直接执行、不播放光标动画。因此被 Agent 触发的流程**不得依赖** `requestAnimationFrame`、`transitionend`、动画结束回调来推进业务状态。
+
+## 知识文档维护原则
+
+- 只写当前状态，**覆盖式更新**，不写变更历史，不保留旧逻辑，不加废弃标记。
+- 页面删除时，同步删除知识文档和索引行。
+- 不确定某动作是否危险、某区域是否敏感时，先向用户确认再定。
+
+## 提交前自检
+
+- [ ] 知识文档已新增/更新，索引已同步
+- [ ] 所有可交互元素都有 `data-agent-id`，命名符合规范，列表项带业务 ID
+- [ ] 危险操作有 `data-agent-danger`，敏感内容有 `data-agent-ignore`
+- [ ] 业务动作不是只写在组件回调里
+- [ ] 路由 `handle.agent.pageId` 与文档文件名一致
+- [ ] 文档中的动作与代码中的埋点/工具一一对应
