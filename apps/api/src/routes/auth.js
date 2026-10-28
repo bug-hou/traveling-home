@@ -15,6 +15,8 @@ const REUSE_GRACE_MS = 10_000;
 
 const email = z.string().trim().toLowerCase().email().max(254);
 const newPassword = z.string().min(8, '密码至少 8 位').max(128, '密码最长 128 位');
+const publicHandle = z.string().regex(/^[a-z][a-z0-9-]{2,29}$/, '用户名需以字母开头，使用 3–30 位小写字母、数字或连字符');
+const reservedHandles = new Set(['api', 'app', 'assets', 'admin', 'www', 'share', 'login', 'register', 'files', 'settings', 'upload', 's']);
 
 const registerBody = z
   .object({
@@ -42,6 +44,7 @@ function publicUser(user) {
     id: String(user._id),
     email: user.email,
     nickname: user.nickname,
+    publicHandle: user.publicHandle ?? null,
     role: user.role,
     createdAt: user.createdAt,
   };
@@ -49,6 +52,7 @@ function publicUser(user) {
 
 export default async function authRoutes(app, { cfg, db, tokens, requireAuth }) {
   const users = db.collection('users');
+  const handles = db.collection('handles');
   const sessions = db.collection('sessions');
 
   const cookieBase = { httpOnly: true, secure: cfg.isProd, sameSite: 'lax' };
@@ -274,6 +278,26 @@ export default async function authRoutes(app, { cfg, db, tokens, requireAuth }) 
       return { ok: true };
     },
   );
+
+  // 公开用户名是可修改的别名；Mongo _id、JWT sub 和 COS 路径始终不变。
+  app.patch('/handle', { preHandler: requireAuth, config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (req, reply) => {
+    const body = parseBody(z.object({ handle: publicHandle }).strict(), req.body, reply);
+    if (!body) return;
+    if (reservedHandles.has(body.handle)) return fail(reply, 400, 'RESERVED_HANDLE', '此用户名不可使用');
+    const userId = req.user._id;
+    if (req.user.publicHandle === body.handle) return { user: publicUser(req.user) };
+    const previous = req.user.publicHandle ?? null;
+    try {
+      await handles.insertOne({ _id: body.handle, userId, createdAt: new Date() });
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+      const reserved = await handles.findOne({ _id: body.handle });
+      if (!reserved || !reserved.userId.equals(userId)) return fail(reply, 409, 'HANDLE_TAKEN', '公开用户名已被占用');
+    }
+    const result = await users.updateOne({ _id: userId, publicHandle: previous }, { $set: { publicHandle: body.handle, updatedAt: new Date() } });
+    if (result.matchedCount !== 1) return fail(reply, 409, 'HANDLE_CHANGED', '用户名已变化，请刷新后重试');
+    return { user: publicUser({ ...req.user, publicHandle: body.handle }) };
+  });
 
   // 当前用户
   app.get('/me', { preHandler: requireAuth }, async (req) => ({ user: publicUser(req.user) }));

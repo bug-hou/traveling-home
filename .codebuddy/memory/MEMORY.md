@@ -2,7 +2,7 @@
 
 ## 项目
 - 为旅游博主做的个人网盘 + 足迹地图网站（替代大疆云盘）。第一版仅网页、仅国内、先不做多博主/收费，但账号系统完整。
-- 仓库：/Users/bughou/Desktop/console/movehome，方案文档 docs/需求与技术方案.md，页面目录 docs/前端页面目录.md，首页接口契约 docs/首页接口契约.md，后端 apps/api，前端 apps/web（认证/账号/上传/文件管理页已实现；首页仍仅有 design/ 静态稿）。2026-10-28 已部署文件详情、私有签名 URL 的后端及 Lighthouse `/app/` 前端；真实用户图片读取尚待登录会话验证。
+- 仓库：/Users/bughou/Desktop/console/movehome，方案文档 docs/需求与技术方案.md，页面目录 docs/前端页面目录.md，首页接口契约 docs/首页接口契约.md，后端 apps/api，前端 apps/web（认证/账号/上传/文件管理/首页已在本地实现）。2026-10-28 Lighthouse `/app/` 与原片私有签名接口已部署；后续本地首页 `/home/summary` 及受控大图缩略图代码尚未发布，真实用户图片读取待本人登录验证。
 
 ## 技术选型
 - 前端：Vite 8 + React 18（Arco 需 React≤18）+ TypeScript 5.9 + Tailwind v4 + Arco Design + react-router-dom 7；2026-10-28 核实 `convenience.top` 当前是另一站点，旧“前端已部署 Makers/域名 convenience.top”记录不实，故在 Lighthouse 通过 `https://api.convenience.top/app/` 独立子路径发布，不覆盖主站。样式层顺序 theme/base/components/utilities，Arco CSS 放 components 层、不引入 Tailwind preflight，保证工具类能覆盖 Arco。路径别名 @ → src；环境变量统一从 src/config/env.ts 读取（VITE_API_BASE_URL、VITE_TENCENT_MAP_KEY）。
@@ -26,7 +26,7 @@
 - 环境变量文件 /opt/movehome/api.env（ubuntu，600），含 COS/地图/Mongo/JWT 等；密钥不得写入仓库、文档、记忆、聊天回显。
 - MongoDB 已启用认证；库 movehome，用户 movehome_app；管理员 mhadmin 密码在 /root/.mongo-admin。
 - aishangli 已废弃并停用，备份在 /opt/backup/aishangli-20261027-1549。
-- 部署方式：Lighthouse 集成上传后端源码/静态构建，预装依赖并跑测试，备份后切换并验证服务健康；保留可回滚目录。2026-10-28 最新发布：`/opt/movehome/api` 为含节点详情与签名访问的版本，旧版 `/opt/movehome/api-previous-20261028-preview`；环境变量备份 `/opt/movehome/api.env.previous-20261028-preview`（变更前）及 `.previous-20261028-web`（前端发布前），nginx 备份 `/opt/movehome/nginx-movehome-previous-20261028-web.conf`。`COS_READ_DOMAIN=assets.convenience.top`；匿名签名路由 401、健康 200，服务端签名不存在对象经自定义域名返回 404；真实用户图片仍待用本人登录复验。Lighthouse 前端 `https://api.convenience.top/app/` 可打开，API Origin 已加入允许清单，但 COS 对此新来源 PUT 预检 403，需桶管理员在控制台补 CORS（Allow-Origin `https://api.convenience.top`、上传方法/头、暴露 ETag），否则该入口暂不能直传。COS 子账号历史上读取桶 CORS 也返回 403，不要假设可由当前服务端凭据修改桶策略。
+- 部署方式：Lighthouse 集成上传后端源码/静态构建，预装依赖并跑测试，备份后切换并验证服务健康；保留可回滚目录。2026-10-28 最新发布：`/opt/movehome/api` 为含节点详情与签名访问的版本，旧版 `/opt/movehome/api-previous-20261028-preview`；环境变量备份 `/opt/movehome/api.env.previous-20261028-preview`（变更前）及 `.previous-20261028-web`（前端发布前），nginx 备份 `/opt/movehome/nginx-movehome-previous-20261028-web.conf`。`COS_READ_DOMAIN=assets.convenience.top`；匿名签名路由 401、健康 200，服务端签名不存在对象经自定义域名返回 404；真实用户图片仍待用本人登录复验。Lighthouse 前端 `https://api.convenience.top/app/` 可打开，API Origin 已加入允许清单，但 2026-10-28 重新只读复核：COS 对 Lighthouse 来源 `https://api.convenience.top` 的 PUT 预检已返回 200（之前为 403），浏览器真实上传仍待本人验证；无需再把该来源的 CORS 配置视作当前阻断。COS 子账号历史上读取桶 CORS 也返回 403，不要假设可由当前服务端凭据修改桶策略。
 
 ## 用户偏好/约定
 - 前端页面设计与开发希望优先评估并复用已选的 Arco Design 通用控件（选择器、菜单、弹窗、表单等），再做品牌视觉定制；特色业务组件可自定义，但需说明不用组件库的原因。2026-10-28 用户指出已安装 Arco 却未在正式页面落地，建议通过项目规则固化；尚未修改规则文件。

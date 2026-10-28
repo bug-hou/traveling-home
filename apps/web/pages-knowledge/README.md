@@ -17,8 +17,10 @@
 | `login` | `/login` | 登录 | `login.md` |
 | `register` | `/register` | 注册 | `register.md` |
 | `account` | `/settings/account` | 账号与安全设置 | `account.md` |
-| `upload` | `/upload` | 上传素材与队列（COS 直传已接入） | `upload.md` |
+| `upload` | `/upload` | 上传素材与队列（含失败重试） | `upload.md` |
 | `files` | `/files/:folderId?` | 文件浏览与管理、按需安全预览 | `files.md` |
+| `shares` | `/shares`、`/shares/new?targetId=...`、`/shares/:id/edit` | 分享管理与活动页配置 | `shares.md` |
+| `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 公开分享与活动展示 | `publicShare.md` |
 
 表中为应用内部路由；Lighthouse 部署在 `https://api.convenience.top/app/`，实际访问需在路由前添加 `/app`。本地开发仍使用根路径，不改变 pageId 和 Agent 埋点。
 

@@ -1,0 +1,266 @@
+import { randomBytes } from 'node:crypto';
+import { ObjectId } from 'mongodb';
+import { z } from 'zod';
+import { fail, parseBody } from '../lib/http.js';
+import { hashPassword, verifyPassword } from '../lib/password.js';
+
+const id = z.string().regex(/^[a-f\d]{24}$/i);
+const handle = z.string().regex(/^[a-z][a-z0-9-]{2,29}$/);
+const slug = z.string().regex(/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/, '路径需为 1–48 位小写字母、数字或连字符');
+const settings = z.object({
+  slug: slug.optional(),
+  title: z.string().trim().min(1).max(80).optional(),
+  description: z.string().trim().max(1000).optional(),
+  mode: z.enum(['standard', 'activity']).optional(),
+  coverNodeId: id.nullable().optional(),
+  password: z.string().min(4).max(128).nullable().optional(),
+  requireLogin: z.boolean().optional(),
+  expiresAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  allowPreview: z.boolean().optional(),
+  allowDownload: z.boolean().optional(),
+  maxDownloads: z.number().int().min(1).max(1_000_000).nullable().optional(),
+}).strict();
+const createBody = settings.extend({ targetId: id });
+const browseBody = z.object({ password: z.string().max(128).optional(), parentId: id.optional(), offset: z.number().int().min(0).max(100_000).default(0) }).strict();
+const accessBody = z.object({ password: z.string().max(128).optional(), purpose: z.enum(['preview', 'download']) }).strict();
+const INLINE = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav']);
+const COVER_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
+function publicNode(node) {
+  return { id: String(node._id), parentId: node.parentId ? String(node.parentId) : null, type: node.type, name: node.name, size: node.size ?? 0, mime: node.mime ?? null };
+}
+
+function ownerShare(share) {
+  return {
+    id: String(share._id), targetId: String(share.targetId), targetType: share.targetType,
+    slug: share.slug, title: share.title, description: share.description, mode: share.mode,
+    coverNodeId: share.coverNodeId ? String(share.coverNodeId) : null,
+    hasPassword: Boolean(share.passwordHash), requireLogin: share.requireLogin,
+    expiresAt: share.expiresAt, allowPreview: share.allowPreview, allowDownload: share.allowDownload,
+    maxDownloads: share.maxDownloads, downloadCount: share.downloadCount, viewCount: share.viewCount,
+    revokedAt: share.revokedAt, createdAt: share.createdAt,
+  };
+}
+
+async function activeNode(nodes, userId, nodeId) {
+  return nodes.findOne({ _id: nodeId, userId, deletedAt: null });
+}
+
+// Traverse current parents, not a cached path: moving a file outside a shared folder revokes its access.
+async function insideShare(nodes, share, nodeId) {
+  const seen = new Set();
+  let current = nodeId;
+  for (let depth = 0; current && depth < 100; depth++) {
+    const key = String(current);
+    if (seen.has(key)) return null;
+    seen.add(key);
+    const node = await activeNode(nodes, share.userId, current);
+    if (!node) return null;
+    if (key === String(share.targetId)) return node;
+    current = node.parentId;
+  }
+  return null;
+}
+
+export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
+  const shares = db.collection('shares');
+  const nodes = db.collection('nodes');
+  const users = db.collection('users');
+  const handles = db.collection('handles');
+  const noStore = (_req, reply, done) => { reply.header('Cache-Control', 'private, no-store'); reply.header('Referrer-Policy', 'no-referrer'); done(); };
+
+  async function settingsUpdate(body, current, reply) {
+    const changes = {};
+    if (body.expiresAt !== undefined) {
+      const expiresAt = body.expiresAt ? new Date(body.expiresAt) : null;
+      if (expiresAt && expiresAt.getTime() <= Date.now()) {
+        fail(reply, 400, 'INVALID_EXPIRY', '到期时间必须晚于当前时间');
+        return null;
+      }
+      changes.expiresAt = expiresAt;
+    }
+    if (body.maxDownloads !== undefined && body.maxDownloads !== null && body.maxDownloads < (current?.downloadCount ?? 0)) {
+      fail(reply, 409, 'LIMIT_USED', '下载额度不能小于已经签发的次数');
+      return null;
+    }
+    for (const field of ['slug', 'title', 'description', 'mode', 'requireLogin', 'allowPreview', 'allowDownload', 'maxDownloads']) {
+      if (body[field] !== undefined) changes[field] = body[field];
+    }
+    if (body.password !== undefined) changes.passwordHash = body.password === null ? null : await hashPassword(body.password);
+    if (body.coverNodeId !== undefined) changes.coverNodeId = body.coverNodeId ? new ObjectId(body.coverNodeId) : null;
+    if (changes.allowPreview === false && changes.allowDownload === false) {
+      fail(reply, 400, 'NO_ACCESS', '预览和下载至少开启一项');
+      return null;
+    }
+    return changes;
+  }
+
+  async function validCover(share, coverNodeId) {
+    if (!coverNodeId) return true;
+    const cover = await activeNode(nodes, share.userId, coverNodeId);
+    return Boolean(cover?.type === 'file' && cover.status === 'ready' && COVER_MIME.has(cover.mime?.toLowerCase()) && await insideShare(nodes, share, coverNodeId));
+  }
+
+  app.post('/shares', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
+    const body = parseBody(createBody, req.body, reply);
+    if (!body) return;
+    if (!req.user.publicHandle) return fail(reply, 409, 'HANDLE_REQUIRED', '请先在账号设置中设置公开用户名');
+    const targetId = new ObjectId(body.targetId);
+    const node = await activeNode(nodes, req.user._id, targetId);
+    if (!node || (node.type === 'file' && node.status !== 'ready')) return fail(reply, 404, 'NODE_NOT_FOUND', '文件或文件夹不存在');
+    const changes = await settingsUpdate(body, null, reply);
+    if (!changes) return;
+    const now = new Date();
+    const share = {
+      userId: req.user._id, targetId, targetType: node.type,
+      slug: changes.slug ?? `journey-${randomBytes(6).toString('hex')}`,
+      title: changes.title ?? node.name, description: changes.description ?? '', mode: changes.mode ?? 'standard',
+      coverNodeId: changes.coverNodeId ?? null, passwordHash: changes.passwordHash ?? null,
+      requireLogin: changes.requireLogin ?? false, expiresAt: changes.expiresAt ?? null,
+      allowPreview: changes.allowPreview ?? true, allowDownload: changes.allowDownload ?? true,
+      maxDownloads: changes.maxDownloads ?? null, downloadCount: 0, viewCount: 0,
+      revokedAt: null, createdAt: now, updatedAt: now,
+    };
+    if (!share.allowPreview && !share.allowDownload) return fail(reply, 400, 'NO_ACCESS', '预览和下载至少开启一项');
+    if (!await validCover(share, share.coverNodeId)) return fail(reply, 400, 'INVALID_COVER', '封面须为分享范围内已就绪的图片');
+    try { await shares.insertOne(share); } catch (error) {
+      if (error?.code === 11000) return fail(reply, 409, 'SLUG_TAKEN', '此自定义路径已被使用');
+      throw error;
+    }
+    return reply.code(201).send({ share: ownerShare(share), handle: req.user.publicHandle });
+  });
+
+  app.get('/shares', { preHandler: [requireAuth, noStore] }, async (req) => {
+    const items = await shares.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(200).toArray();
+    return { items: items.map(ownerShare), handle: req.user.publicHandle ?? null };
+  });
+
+  app.patch('/shares/:id', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
+    if (!id.safeParse(req.params.id).success) return fail(reply, 400, 'INVALID_INPUT', '分享 ID 格式不正确');
+    const body = parseBody(settings, req.body, reply);
+    if (!body) return;
+    const _id = new ObjectId(req.params.id);
+    const current = await shares.findOne({ _id, userId: req.user._id, revokedAt: null });
+    if (!current) return fail(reply, 404, 'SHARE_NOT_FOUND', '分享不存在');
+    const changes = await settingsUpdate(body, current, reply);
+    if (!changes) return;
+    if (changes.allowPreview === false && !('allowDownload' in changes) && !current.allowDownload || changes.allowDownload === false && !('allowPreview' in changes) && !current.allowPreview) {
+      return fail(reply, 400, 'NO_ACCESS', '预览和下载至少开启一项');
+    }
+    if (!await validCover(current, changes.coverNodeId === undefined ? current.coverNodeId : changes.coverNodeId)) return fail(reply, 400, 'INVALID_COVER', '封面须为分享范围内已就绪的图片');
+    try {
+      const updated = await shares.findOneAndUpdate(
+        { _id, userId: req.user._id, revokedAt: null, ...(changes.maxDownloads == null ? {} : { downloadCount: { $lte: changes.maxDownloads } }) },
+        { $set: { ...changes, updatedAt: new Date() } }, { returnDocument: 'after' },
+      );
+      if (!updated) return fail(reply, 409, 'LIMIT_USED', '下载额度已变化，请重试');
+      return { share: ownerShare(updated), handle: req.user.publicHandle };
+    } catch (error) {
+      if (error?.code === 11000) return fail(reply, 409, 'SLUG_TAKEN', '此自定义路径已被使用');
+      throw error;
+    }
+  });
+
+  app.delete('/shares/:id', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
+    if (!id.safeParse(req.params.id).success) return fail(reply, 400, 'INVALID_INPUT', '分享 ID 格式不正确');
+    const result = await shares.updateOne({ _id: new ObjectId(req.params.id), userId: req.user._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
+    if (!result.matchedCount) return fail(reply, 404, 'SHARE_NOT_FOUND', '分享不存在');
+    return reply.code(204).send();
+  });
+
+  async function resolve(req, reply, password) {
+    const deny = (status, code, message) => { fail(reply, status, code, message); return null; };
+    const path = z.object({ handle, slug }).safeParse(req.params);
+    if (!path.success) return deny(404, 'SHARE_NOT_FOUND', '分享不存在');
+    const ownerHandle = await handles.findOne({ _id: path.data.handle });
+    if (!ownerHandle) return deny(404, 'SHARE_NOT_FOUND', '分享不存在');
+    const share = await shares.findOne({ userId: ownerHandle.userId, slug: path.data.slug, revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] });
+    if (!share || !await activeNode(nodes, share.userId, share.targetId)) return deny(404, 'SHARE_NOT_FOUND', '分享不存在或已失效');
+    const owner = await users.findOne({ _id: share.userId, status: 'active' });
+    if (!owner) return deny(404, 'SHARE_NOT_FOUND', '分享不存在或已失效');
+    if (share.requireLogin) {
+      await requireAuth(req, reply);
+      if (reply.sent) return null;
+    }
+    if (share.passwordHash && (!password || !await verifyPassword(share.passwordHash, password))) {
+      return deny(403, 'PASSWORD_REQUIRED', '请输入正确的分享提取码');
+    }
+    return { share, owner };
+  }
+
+  app.post('/public/shares/:handle/:slug/browse', { preHandler: noStore, config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const body = parseBody(browseBody, req.body, reply);
+    if (!body) return;
+    const resolved = await resolve(req, reply, body.password);
+    if (!resolved) return;
+    const { share, owner } = resolved;
+    const root = await activeNode(nodes, share.userId, share.targetId);
+    const parent = body.parentId ? await activeNode(nodes, share.userId, new ObjectId(body.parentId)) : root;
+    if (!root || !parent || !await insideShare(nodes, share, parent._id) || (parent.type !== 'folder' && String(parent._id) !== String(root._id))) {
+      return fail(reply, 404, 'NODE_NOT_FOUND', '文件或文件夹不存在');
+    }
+    const breadcrumbs = [];
+    if (parent.type === 'folder') {
+      let cursor = parent;
+      for (let depth = 0; cursor && depth < 100; depth++) {
+        breadcrumbs.unshift(publicNode(cursor));
+        if (String(cursor._id) === String(root._id)) break;
+        cursor = await activeNode(nodes, share.userId, cursor.parentId);
+      }
+      if (String(breadcrumbs[0]?.id) !== String(root._id)) return fail(reply, 404, 'NODE_NOT_FOUND', '文件夹已移出分享范围');
+    }
+    const filter = { userId: share.userId, parentId: parent._id, deletedAt: null };
+    const total = parent.type === 'folder' ? await nodes.countDocuments(filter) : 0;
+    const items = parent.type === 'folder' ? await nodes.find(filter).sort({ name: 1, _id: 1 }).skip(body.offset).limit(50).toArray() : [];
+    if (!body.parentId && body.offset === 0) await shares.updateOne({ _id: share._id }, { $inc: { viewCount: 1 } });
+    return {
+      share: { title: share.title, description: share.description, mode: share.mode, coverNodeId: share.coverNodeId ? String(share.coverNodeId) : null,
+        requireLogin: share.requireLogin, hasPassword: Boolean(share.passwordHash), expiresAt: share.expiresAt,
+        allowPreview: share.allowPreview, allowDownload: share.allowDownload, maxDownloads: share.maxDownloads, downloadCount: share.downloadCount,
+        ownerName: owner.nickname, handle: owner.publicHandle },
+      root: publicNode(root), breadcrumbs, items: items.map(publicNode), total, offset: body.offset,
+    };
+  });
+
+  app.post('/public/shares/:handle/:slug/files/:nodeId/access', { preHandler: noStore, config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const body = parseBody(accessBody, req.body, reply);
+    if (!body) return;
+    if (!id.safeParse(req.params.nodeId).success) return fail(reply, 404, 'NODE_NOT_FOUND', '文件不存在');
+    const resolved = await resolve(req, reply, body.password);
+    if (!resolved) return;
+    const { share } = resolved;
+    if (body.purpose === 'download' && !share.allowDownload || body.purpose === 'preview' && !share.allowPreview) {
+      return fail(reply, 403, 'ACCESS_DISABLED', '分享未开放此操作');
+    }
+    const nodeId = new ObjectId(req.params.nodeId);
+    const node = await activeNode(nodes, share.userId, nodeId);
+    if (!node || node.type !== 'file' || node.status !== 'ready' || !await insideShare(nodes, share, nodeId)) {
+      return fail(reply, 404, 'NODE_NOT_FOUND', '文件不存在');
+    }
+    if (!cos || !cfg?.cos) return fail(reply, 503, 'STORAGE_UNAVAILABLE', '文件访问暂不可用');
+    if (typeof node.cosKey !== 'string' || !node.cosKey.startsWith(`${cfg.cos.prefix}/users/${share.userId}/originals/`)) {
+      return fail(reply, 409, 'FILE_NOT_AVAILABLE', '文件存储信息不可用');
+    }
+    const mime = INLINE.has(node.mime?.toLowerCase()) ? node.mime.toLowerCase() : 'application/octet-stream';
+    if (body.purpose === 'preview' && mime === 'application/octet-stream') return fail(reply, 422, 'PREVIEW_UNSUPPORTED', '此格式不支持在线预览');
+    const inline = body.purpose === 'preview';
+    const disposition = inline ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(node.name ?? 'download')}`;
+    let url;
+    try { url = await cos.signReadUrl(node.cosKey, { disposition, mime: inline ? mime : 'application/octet-stream', expires: 60 }); }
+    catch (error) {
+      req.log.error({ err: error, nodeId: String(nodeId) }, 'unable to sign shared file URL');
+      return fail(reply, 503, 'STORAGE_UNAVAILABLE', '文件访问暂不可用');
+    }
+    if (!inline) {
+      const filter = { _id: share._id, revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] };
+      if (share.maxDownloads !== null) filter.downloadCount = { $lt: share.maxDownloads };
+      const result = await shares.updateOne(filter, { $inc: { downloadCount: 1 } });
+      if (!result.matchedCount) return fail(reply, 429, 'DOWNLOAD_LIMIT', '分享下载次数已用尽或分享已失效');
+    } else {
+      // Close the signing/revocation race before returning a bearer URL.
+      const active = await shares.findOne({ _id: share._id, revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] });
+      if (!active) return fail(reply, 404, 'SHARE_NOT_FOUND', '分享已失效');
+    }
+    return { url, expiresAt: new Date(Date.now() + 60_000), name: node.name, mime: inline ? mime : 'application/octet-stream', previewable: inline };
+  });
+}

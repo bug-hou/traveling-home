@@ -41,7 +41,7 @@
 | `upload.queue.pauseAll` | 点击 | 暂停或继续正在传输的任务 | 无 | 否 |
 | `upload.queue.row.{itemId}.pause` / `.resume` | 点击 | 暂停或继续单个任务 | 队列任务 ID | 否 |
 | `upload.queue.row.{itemId}.cancel` | 点击 | 中止正在传输的任务并从页面队列移除；COS 可能保留未完成分片 | 队列任务 ID | 是 |
-| `upload.queue.row.{itemId}.retryAction` | 点击 | 重新上传失败文件；若云端已上传而登记失败，则只重试登记 | 队列任务 ID | 否 |
+| `upload.queue.row.{itemId}.retryAction` | 点击 | 失败项的“重新上传”按钮会重传文件；若云端已上传而登记失败，则按钮显示“重试登记”、仅重试登记 | 队列任务 ID | 否 |
 | `upload.queue.row.{itemId}.remove` | 点击 | 从页面队列移除尚未开始或失败的任务；不删除云端文件 | 队列任务 ID | 否 |
 | `upload.queue.clearCompleted` | 点击 | 清除已完成的队列展示项；不删除云端文件 | 无 | 否 |
 

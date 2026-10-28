@@ -331,6 +331,7 @@ export default function FilesPage() {
         <Link to="/files" className="active" aria-current="page" data-agent-id="nav.files" {...dropProps(null)}>▤ <span>全部文件</span></Link>
         <button type="button" disabled data-agent-id="nav.map">⌖ <span>足迹地图</span></button>
         <button type="button" disabled data-agent-id="nav.trips">▦ <span>旅行</span></button>
+        <Link to="/shares" data-agent-id="nav.shares">◇ <span>我的分享</span></Link>
         <button type="button" disabled data-agent-id="nav.trash">⌫ <span>回收站</span></button>
       </nav>
       <div className="files-quick"><small>快速访问</small>{path.slice(1).map((entry) => <Link key={entry.id} to={`/files/${entry.id}`} data-agent-id={`files.nav.folder.${entry.id}`} {...dropProps(entry.id)}>▤ {entry.name}</Link>)}</div>
@@ -355,8 +356,10 @@ export default function FilesPage() {
             <button type="button" className="files-card-main" data-agent-id={`files.row.${node.id}.open`} onClick={() => node.type === 'folder' ? navigate(`/files/${node.id}`) : openPreview(node)}>{node.type === 'file' && node.status === 'ready' && CARD_IMAGE_MIMES.has(node.mime?.toLowerCase() ?? '') && node.size > 0 && node.size <= CARD_IMAGE_THUMBNAIL_MAX_BYTES ? <FileThumbnail node={node} /> : <span className={`files-thumb files-thumb--${kind(node)}`}><span aria-hidden="true">{node.type === 'folder' ? '▤' : kind(node) === '视频' ? '▶' : kind(node) === '音频' ? '♫' : '▧'}</span><small>{kind(node)}</small></span>}<span className="files-card-copy"><b title={node.name}>{node.name}</b><small>{node.type === 'folder' ? '文件夹 · 点击打开' : `${formatSize(node.size)} · ${new Date(node.uploadedAt || node.updatedAt).toLocaleDateString('zh-CN')}`}</small></span>{view === 'list' && <span className="files-list-size">{node.type === 'folder' ? '—' : formatSize(node.size)}</span>}</button>
             <Dropdown trigger="click" position="br" popupVisible={menuId === node.id} onVisibleChange={(visible) => setMenuId(visible ? node.id : null)} getPopupContainer={getFilesPopupContainer} droplist={
               <Menu className="files-action-menu" data-agent-region={`files.row.${node.id}.menu`} onClickMenuItem={(key) => {
+                if (key === 'share') { setMenuId(null); navigate(`/shares/new?targetId=${node.id}`); }
                 if (key === 'rename' || key === 'move' || key === 'delete') openAction({ kind: key, node });
               }}>
+                <Menu.Item key="share" wrapper="button" data-agent-id={`files.row.${node.id}.share`}>分享文件{node.type === 'folder' ? '夹' : ''}</Menu.Item>
                 <Menu.Item key="rename" wrapper="button" data-agent-id={`files.row.${node.id}.rename`}>重命名</Menu.Item>
                 <Menu.Item key="move" wrapper="button" data-agent-id={`files.row.${node.id}.move`}>移动到…</Menu.Item>
                 <Menu.Item key="delete" wrapper="button" className="files-action-menu-danger" data-agent-id={`files.row.${node.id}.delete`} data-agent-danger="true">移入回收站</Menu.Item>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import { Link, useBlocker, useBeforeUnload, useSearchParams } from 'react-router-dom';
-import { Modal, Progress } from '@arco-design/web-react';
+import { Button, Modal, Progress } from '@arco-design/web-react';
+import { IconRefresh } from '@arco-design/web-react/icon';
 import { ApiError } from '@/services/api';
 import { nodesApi } from '@/services/nodes';
 import type { NodeSummary } from '@/services/nodes';
@@ -561,7 +562,18 @@ export default function UploadPage() {
                           <span>{item.error || (item.status === 'completed' ? '已保存到云空间' : item.status === 'registering' ? '正在校验云端文件并登记…' : item.status === 'paused' ? `${formatBytes(item.loaded)} / ${formatBytes(item.file.size)} · 已暂停` : item.status === 'uploading' ? `${formatBytes(item.loaded)} / ${formatBytes(item.file.size)}` : item.status === 'registration_failed' ? '文件已上传；仅需重试登记' : '等待开始')}</span>
                           <span>{item.status === 'uploading' && item.speed > 0 ? `${formatBytes(item.speed)}/s · ${formatClock(remaining)}` : ''}</span>
                         </div>
-                        {(item.status === 'failed' || item.status === 'registration_failed') && <button className="upload-retry-button" type="button" data-agent-id={`upload.queue.row.${item.id}.retryAction`} onClick={() => retryItem(item)}>{item.status === 'registration_failed' ? '重试登记' : '重新上传'} ↻</button>}
+                        {(item.status === 'failed' || item.status === 'registration_failed') && (
+                          <Button
+                            className="upload-retry-button"
+                            type="secondary"
+                            htmlType="button"
+                            icon={<IconRefresh aria-hidden="true" />}
+                            data-agent-id={`upload.queue.row.${item.id}.retryAction`}
+                            onClick={() => retryItem(item)}
+                          >
+                            {item.status === 'registration_failed' ? '重试登记' : '重新上传'}
+                          </Button>
+                        )}
                       </div>
                       {renderItemAction(item)}
                     </article>

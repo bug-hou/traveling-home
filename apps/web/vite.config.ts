@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
   );
 
   return {
+    // Main app lives under /app/; the same source can be built for the share host at /.
+    base: env.VITE_APP_BASE || (mode === 'production' ? '/app/' : '/'),
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

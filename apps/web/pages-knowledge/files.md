@@ -30,7 +30,8 @@
 | `files.toolbar.search`、`files.toolbar.sort`、`files.toolbar.sortOption.{sort}`、`files.toolbar.grid`、`files.toolbar.list` | 搜索名称（支持 ⌘/Ctrl+K 聚焦）、展开排序并选择 `name/updated/size/created`、切换网格/列表 | 名称/排序/视图 | 否 |
 | `files.toolbar.createFolder`、`files.empty.createFolder` | 新建文件夹 | 名称 | 否 |
 | `files.row.{nodeId}.open` | 打开目录或申请文件预览 | `nodeId` | 否 |
-| `files.row.{nodeId}.more`、`.rename`、`.move` | 打开菜单、改名、移动 | `nodeId` | 否 |
+| `files.row.{nodeId}.more`、`.rename`、`.move`、`.share` | 打开菜单、改名、移动，或前往 `/shares/new?targetId=...` 配置分享 | `nodeId` | 否 |
+| `nav.shares` | 打开我的分享管理页 | 无 | 否 |
 | `files.row.{nodeId}.delete`、`files.dialog.submit`（删除时） | 软删除文件或整棵目录到回收站 | `nodeId` | 是 |
 | `files.library.loadMore`、`files.library.retry`、`files.library.goRoot` | 分页、重试、回根目录 | 无 | 否 |
 | `files.dialog.name`、`.folder.{folderId}`、`.path.{folderId}`、`.loadMore`、`.submit`、`.cancel`、`.close` | 编辑/选择目标/确认或关闭弹层 | 名称、目标目录 ID | 删除时是 |

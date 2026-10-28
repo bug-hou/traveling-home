@@ -131,9 +131,10 @@
 .upload-row-action--cancel { color: #bd7668; }
 .upload-row-action--cancel:hover { background: #fff1ed; color: #a95f52; }
 .upload-row-action--done { color: #5da28a; font-weight: 700; }
-.upload-row-action--retry { color: #c37e70; }
 .upload-row-action--busy { color: #5a988c; font-size: 20px; }
-.upload-retry-button { margin-top: 5px; padding: 0; border: 0; background: transparent; color: #b76e5f; font-size: 8px; }
+.upload-app .upload-retry-button.arco-btn { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; margin-top: 9px; padding: 0 13px; border: 1px solid #c9e4da; border-radius: 9px; background: #f0f9f5; box-shadow: 0 2px 6px rgba(17, 127, 118, .04); color: #176f64; font-size: 12px; font-weight: 650; transition: background .2s, border-color .2s, box-shadow .2s; }
+.upload-app .upload-retry-button.arco-btn:not(:disabled):hover { border-color: #91cabc; background: #e4f4ed; box-shadow: 0 3px 10px rgba(17, 127, 118, .1); color: #0c6259; }
+.upload-retry-button .arco-icon { font-size: 15px; }
 .upload-queue-empty { display: flex; min-height: 145px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #8a9c9e; }
 .upload-queue-empty>span { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; background: #edf8f4; color: #3b9380; font-size: 21px; }
 .upload-queue-empty b { color: #4b696c; font-size: 10px; }
@@ -286,7 +287,7 @@
 .upload-directory-entry, .upload-directory-select-current { min-height: 44px; }
 .upload-directory-entry>b { font-size: 13px; }
 .upload-directory-message, .upload-directory-error { font-size: 12px; }
-.upload-queue-title small, .upload-file-meta, .upload-file-progress-meta, .upload-queue-footer, .upload-retry-button { font-size: 11px; }
+.upload-queue-title small, .upload-file-meta, .upload-file-progress-meta, .upload-queue-footer { font-size: 11px; }
 .upload-file-title>b { font-size: 13px; }
 .upload-status { font-size: 11px; }
 .upload-start-button, .upload-pause-button { min-height: 38px; padding: 0 12px; font-size: 12px; }
@@ -316,6 +317,7 @@
   .upload-status { font-size: 11px; }
   .upload-file-meta { font-size: 11px; }
   .upload-file-progress-meta { flex-wrap: wrap; font-size: 10px; line-height: 1.5; }
+  .upload-app .upload-retry-button.arco-btn { min-height: 44px; }
   .upload-row-controls { gap: 4px; }
   .upload-row-action { width: 44px; height: 44px; }
   .upload-queue-footer { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 11px; }

@@ -4,6 +4,7 @@ export interface AuthUser {
   id: string;
   email: string;
   nickname: string;
+  publicHandle: string | null;
   role: 'admin' | 'user';
   createdAt: string;
 }
@@ -54,5 +55,10 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  },
+
+  async changeHandle(handle: string) {
+    const result = await apiRequest<UserResponse>('/api/v1/auth/handle', { method: 'PATCH', body: JSON.stringify({ handle }) });
+    return result.user;
   },
 };

@@ -68,7 +68,7 @@ export function createCosService(cfg) {
       return cosCall(client, 'headObject', { Bucket: bucket, Region: region, Key: key });
     },
 
-    async signReadUrl(key, { disposition, mime, thumbnail = false }) {
+    async signReadUrl(key, { disposition, mime, thumbnail = false, expires = 600 }) {
       const data = await cosCall(client, 'getObjectUrl', {
         Bucket: bucket,
         Region: region,
@@ -77,7 +77,7 @@ export function createCosService(cfg) {
         ...(readDomain ? { Domain: readDomain } : {}),
         Method: 'GET',
         Sign: true,
-        Expires: 600,
+        Expires: expires,
         Query: {
           'response-content-disposition': disposition,
           'response-content-type': mime,

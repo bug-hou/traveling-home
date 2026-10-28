@@ -7,7 +7,7 @@ import { useAuth } from '@/features/auth/AuthProvider';
 import '@/styles/account.css';
 
 export default function AccountPage() {
-  const { user, logout, changePassword } = useAuth();
+  const { user, logout, changePassword, changeHandle } = useAuth();
   const navigate = useNavigate();
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -17,6 +17,21 @@ export default function AccountPage() {
   const [busy, setBusy] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [logoutError, setLogoutError] = useState('');
+  const [handle, setHandle] = useState(user?.publicHandle ?? '');
+  const [handleBusy, setHandleBusy] = useState(false);
+  const [handleMessage, setHandleMessage] = useState('');
+
+  async function saveHandle(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setHandleBusy(true);
+    setHandleMessage('');
+    try {
+      await changeHandle(handle.trim().toLowerCase());
+      setHandleMessage('公开用户名已保存；旧分享链接继续有效。');
+    } catch (error) {
+      setHandleMessage(error instanceof Error ? error.message : '保存失败，请重试');
+    } finally { setHandleBusy(false); }
+  }
 
   function closePasswordForm() {
     if (busy) return;
@@ -92,6 +107,17 @@ export default function AccountPage() {
           <div className="account-next__icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="13" fill="currentColor" opacity=".1"/><path d="M13 30.5 20 23l5 4 9-11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="34" cy="16" r="3" fill="currentColor"/><path d="M13 35h22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div>
           <div><h2>开始整理你的旅行素材</h2><p>在文件空间浏览和整理已上传的照片、视频与音频。</p></div>
           <div className="account-next__actions"><Link className="account-next__link" to="/files" data-agent-id="account.next.openFiles">查看文件 <span aria-hidden="true">→</span></Link><Link className="account-next__link" to="/upload" data-agent-id="account.next.openUpload">开始上传 <span aria-hidden="true">↑</span></Link></div>
+        </section>
+
+        <section className="account-security" data-agent-region="account.handle">
+          <div><h2>分享链接用户名</h2><p>全站唯一，修改后旧链接保留；账号内部 ID 不会变化。</p></div>
+          <Link className="account-next__link" to="/shares" data-agent-id="account.handle.openShares">我的分享 →</Link>
+          <form className="account-password-form" onSubmit={saveHandle}>
+            <label>公开用户名<Input value={handle} onChange={setHandle} minLength={3} maxLength={30} placeholder="例如 travel-notes" data-agent-id="account.handle.input" autoComplete="off" /></label>
+            <small>以字母开头，3–30 位小写字母、数字或连字符；网址为 share.convenience.top/用户名/自定义路径</small>
+            {handleMessage && <p role="status">{handleMessage}</p>}
+            <div className="account-form-actions"><Button htmlType="submit" type="primary" loading={handleBusy} disabled={handleBusy || handle.trim() === user?.publicHandle} data-agent-id="account.handle.save">保存用户名</Button></div>
+          </form>
         </section>
 
         <section className="account-security" data-agent-region="account.security">

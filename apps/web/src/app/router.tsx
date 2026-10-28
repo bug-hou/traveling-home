@@ -8,6 +8,8 @@ import AuthPage from '@/pages/AuthPage';
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const UploadPage = lazy(() => import('@/pages/UploadPage'));
 const FilesPage = lazy(() => import('@/pages/FilesPage'));
+const SharesPage = lazy(() => import('@/pages/SharesPage'));
+const PublicSharePage = lazy(() => import('@/pages/PublicSharePage'));
 
 function GuestOnly() {
   const { user, loading } = useAuth();
@@ -28,6 +30,8 @@ export const router = createBrowserRouter([
           { path: '/register', element: <AuthPage />, handle: { agent: { pageId: 'register' } } },
         ],
       },
+      { path: 's/:handle/:slug', element: <Suspense fallback={<main className="auth-loading">正在打开分享…</main>}><PublicSharePage /></Suspense>, handle: { agent: { pageId: 'publicShare' } } },
+      { path: ':handle/:slug', element: <Suspense fallback={<main className="auth-loading">正在打开分享…</main>}><PublicSharePage /></Suspense>, handle: { agent: { pageId: 'publicShare' } } },
       {
         path: '/',
         element: <RequireAuth />,
@@ -36,6 +40,9 @@ export const router = createBrowserRouter([
           { path: 'settings/account', element: <AccountPage />, handle: { agent: { pageId: 'account' } } },
           { path: 'upload', element: <Suspense fallback={<main className="auth-loading">正在打开上传空间…</main>}><UploadPage /></Suspense>, handle: { agent: { pageId: 'upload' } } },
           { path: 'files/:folderId?', element: <Suspense fallback={<main className="auth-loading">正在打开文件空间…</main>}><FilesPage /></Suspense>, handle: { agent: { pageId: 'files' } } },
+          { path: 'shares', element: <Suspense fallback={<main className="auth-loading">正在打开我的分享…</main>}><SharesPage /></Suspense>, handle: { agent: { pageId: 'shares' } } },
+          { path: 'shares/new', element: <Suspense fallback={<main className="auth-loading">正在打开分享配置…</main>}><SharesPage /></Suspense>, handle: { agent: { pageId: 'shares' } } },
+          { path: 'shares/:id/edit', element: <Suspense fallback={<main className="auth-loading">正在打开分享配置…</main>}><SharesPage /></Suspense>, handle: { agent: { pageId: 'shares' } } },
         ],
       },
       { path: '*', element: <Navigate to="/" replace /> },

@@ -3,7 +3,7 @@
 - pageId：`account`
 - 路由：`/settings/account`（Lighthouse 对应 `/app/settings/account`；`/` 是首页）
 - 权限：登录
-- 用途：显示当前账号与会话状态，提供上传素材入口、退出登录和修改密码操作。
+- 用途：显示当前账号与会话状态，设置全站唯一的公开分享用户名，提供上传入口、退出登录和修改密码操作。
 
 ## 页面区域
 
@@ -12,6 +12,7 @@
 | `account.header` | 顶部 | 品牌入口、退出登录 |
 | `account.profile` | 主区上方 | 当前用户邮箱、昵称、角色、登录状态 |
 | `account.next` | 主区中部 | 前往文件空间或上传素材页面 |
+| `account.handle` | 主区 | 设置全站唯一、可修改的公开分享用户名并查看分享 |
 | `account.security` | 主区下方 | 打开修改密码表单 |
 | `account.passwordForm` | 账号安全区内 | 当前密码、新密码、取消、保存 |
 
@@ -23,6 +24,9 @@
 | `account.header.logout` | 点击 | 调用 `POST /api/v1/auth/logout` 并清除本地用户态 | 无 | 否 |
 | `account.next.openFiles` | 点击 | 前往 `/files` 浏览当前用户的文件 | 无 | 否 |
 | `account.next.openUpload` | 点击 | 前往 `/upload` 开始添加素材 | 无 | 否 |
+| `account.handle.openShares` | 点击 | 打开我的分享列表 | 无 | 否 |
+| `account.handle.input`、`.save` | 输入/提交 | 设置全站唯一公开用户名；旧用户名继续有效 | 3–30 位用户名 | 否 |
+| `tool: authApi.changeHandle` | 工具 | 修改公开用户名并更新当前登录态 | 公开用户名 | 否 |
 | `account.security.openPasswordForm` | 点击 | 展开密码修改表单 | 无 | 否 |
 | `account.passwordForm.currentPassword` | 输入 | 输入当前密码（敏感值被忽略） | 密码 | 否 |
 | `account.passwordForm.newPassword` | 输入 | 输入新密码（敏感值被忽略） | 8–128 位新密码 | 否 |
@@ -35,6 +39,7 @@
 |---|---|---|
 | 已登录 | Cookie 会话有效 | `GET /api/v1/auth/me` |
 | 管理员 / 个人账号 | 用户角色展示 | `user.role` |
+| `publicHandle` | 可修改的公开用户名，区别于内部 Mongo ID；旧别名保留 | `user.publicHandle` |
 | 密码更新成功 | 当前浏览器保持登录，其他现有会话被撤销 | change-password API |
 | 当前密码错误 | 密码修改被拒绝 | `WRONG_PASSWORD` |
 

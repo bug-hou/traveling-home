@@ -16,6 +16,12 @@ test('COS is optional until credentials and bucket are configured', () => {
   assert.equal(config.cos, null);
 });
 
+test('image processing is disabled by default and only enabled explicitly', () => {
+  assert.equal(loadConfig(baseEnv()).imageProcessingEnabled, false);
+  assert.equal(loadConfig(baseEnv({ COS_IMAGE_PROCESSING_ENABLED: 'true' })).imageProcessingEnabled, true);
+  assert.equal(loadConfig(baseEnv({ COS_IMAGE_PROCESSING_ENABLED: 'false' })).imageProcessingEnabled, false);
+});
+
 test('COS config derives the account ID from the bucket and normalizes prefix slashes', () => {
   const config = loadConfig(
     baseEnv({

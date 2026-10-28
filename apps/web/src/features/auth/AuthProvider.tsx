@@ -10,6 +10,7 @@ interface AuthContextValue {
   register(input: RegisterInput): Promise<AuthUser>;
   logout(): Promise<void>;
   changePassword(input: ChangePasswordInput): Promise<void>;
+  changeHandle(handle: string): Promise<AuthUser>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -67,9 +68,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // The backend keeps this browser signed in and revokes all other sessions.
   }, []);
 
+  const changeHandle = useCallback(async (handle: string) => {
+    const nextUser = await authApi.changeHandle(handle);
+    setUser(nextUser);
+    return nextUser;
+  }, []);
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, changePassword }),
-    [user, loading, login, register, logout, changePassword],
+    () => ({ user, loading, login, register, logout, changePassword, changeHandle }),
+    [user, loading, login, register, logout, changePassword, changeHandle],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
