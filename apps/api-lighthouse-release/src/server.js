@@ -7,6 +7,8 @@ import { createAccessTokens } from './lib/tokens.js';
 import { createAuthGuard } from './plugins/auth.js';
 import authRoutes from './routes/auth.js';
 import nodeRoutes from './routes/nodes.js';
+import shareRoutes from './routes/shares.js';
+import homeRoutes from './routes/home.js';
 import uploadRoutes from './routes/uploads.js';
 import { createCosService } from './services/cos.js';
 
@@ -85,6 +87,18 @@ export async function buildApp({ cfg, db }) {
     db,
     requireAuth,
     cos,
+  });
+  await app.register(homeRoutes, {
+    prefix: '/api/v1',
+    db,
+    requireAuth,
+  });
+  await app.register(shareRoutes, {
+    prefix: '/api/v1',
+    db,
+    cfg,
+    cos,
+    requireAuth,
   });
 
   return app;

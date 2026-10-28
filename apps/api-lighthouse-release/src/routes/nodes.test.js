@@ -288,7 +288,7 @@ test('search treats user input as a literal case-insensitive substring', async (
 });
 
 test('file access signs the custom domain for the owner only', async (t) => {
-  const cfg = { cos: {
+  const cfg = { imageProcessingEnabled: true, cos: {
     secretId: 'test-id', secretKey: 'test-key', bucket: 'test-cos-1312827847',
     region: 'ap-chengdu', prefix: 'movehome', readDomain: 'assets.convenience.top',
   } };
@@ -300,7 +300,7 @@ test('file access signs the custom domain for the owner only', async (t) => {
   const path = `movehome/users/${owner}/originals/2026/10/${fileId}.jpg`;
   await db.collection('nodes').insertOne({
     _id: fileId, userId: owner, parentId: null, type: 'file', status: 'ready',
-    deletedAt: null, name: '旅行照片.jpg', mime: 'image/jpeg', cosKey: path,
+    deletedAt: null, name: '旅行照片.jpg', mime: 'image/jpeg', size: 8 * 1024 * 1024, cosKey: path,
   });
   const endpoint = `/api/v1/nodes/${fileId}/url`;
   const unauthenticated = await app.inject({ method: 'GET', url: endpoint });
@@ -318,6 +318,14 @@ test('file access signs the custom domain for the owner only', async (t) => {
   assert.match(signed.searchParams.get('q-header-list'), /host/);
   assert.ok(signed.searchParams.get('q-signature'));
   assert.equal(signed.searchParams.get('response-content-disposition'), 'inline');
+
+  const thumbnail = await app.inject({ method: 'GET', url: `${endpoint}?purpose=thumbnail`, headers: { 'x-test-user': String(owner) } });
+  assert.equal(thumbnail.statusCode, 200, thumbnail.body);
+  const signedThumbnail = new URL(thumbnail.json().url);
+  assert.equal(signedThumbnail.origin, 'https://assets.convenience.top');
+  assert.equal(signedThumbnail.searchParams.get('imageMogr2/thumbnail/320x320>/format/jpg/quality/80'), '');
+  assert.match(signedThumbnail.searchParams.get('q-url-param-list'), /imagemogr2%2fthumbnail/);
+  assert.equal(thumbnail.json().mime, 'image/jpeg');
 
   const download = await app.inject({ method: 'GET', url: `${endpoint}?purpose=download`, headers: { 'x-test-user': String(owner) } });
   assert.equal(download.statusCode, 200, download.body);

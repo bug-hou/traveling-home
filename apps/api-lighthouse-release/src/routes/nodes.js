@@ -40,8 +40,10 @@ const listQuerySchema = z
   })
   .strict();
 
-const readUrlQuerySchema = z.object({ purpose: z.enum(['preview', 'download']).default('preview') }).strict();
+const readUrlQuerySchema = z.object({ purpose: z.enum(['preview', 'download', 'thumbnail']).default('preview') }).strict();
 const INLINE_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav']);
+const THUMBNAIL_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const MAX_THUMBNAIL_SOURCE_BYTES = 30 * 1024 * 1024;
 
 const searchQuerySchema = z
   .object({
@@ -249,11 +251,16 @@ export default async function nodeRoutes(app, { cfg, db, requireAuth, cos }) {
       return fail(reply, 409, 'FILE_NOT_AVAILABLE', '文件存储信息不可用');
     }
 
-    const mime = INLINE_MIME.has(node.mime?.toLowerCase()) ? node.mime.toLowerCase() : 'application/octet-stream';
-    const inline = query.data.purpose === 'preview' && mime !== 'application/octet-stream';
+    const thumbnail = query.data.purpose === 'thumbnail';
+    if (thumbnail && !cfg.imageProcessingEnabled) return fail(reply, 503, 'THUMBNAIL_NOT_READY', '图片缩略图尚未启用');
+    if (thumbnail && (!THUMBNAIL_MIME.has(node.mime?.toLowerCase()) || !Number.isSafeInteger(node.size) || node.size <= 0 || node.size > MAX_THUMBNAIL_SOURCE_BYTES)) {
+      return fail(reply, 422, 'THUMBNAIL_UNSUPPORTED', '此文件暂不支持生成缩略图');
+    }
+    const mime = thumbnail ? 'image/jpeg' : INLINE_MIME.has(node.mime?.toLowerCase()) ? node.mime.toLowerCase() : 'application/octet-stream';
+    const inline = thumbnail || (query.data.purpose === 'preview' && mime !== 'application/octet-stream');
     const disposition = inline ? 'inline' : `attachment; filename*=UTF-8''${encodeURIComponent(node.name ?? 'download')}`;
     try {
-      const url = await cos.signReadUrl(node.cosKey, { disposition, mime });
+      const url = await cos.signReadUrl(node.cosKey, { disposition, mime, ...(thumbnail ? { thumbnail: true } : {}) });
       return { url, expiresAt: new Date(Date.now() + 600_000), name: node.name, mime, previewable: inline };
     } catch (error) {
       req.log.error({ err: error, nodeId: String(id) }, 'unable to sign file URL');

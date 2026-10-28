@@ -4,11 +4,11 @@ import Fastify from 'fastify';
 import { ObjectId } from 'mongodb';
 import nodeRoutes from './nodes.js';
 
-function createApp() {
+function createApp({ imageProcessingEnabled = false } = {}) {
   const docs = [];
   const calls = [];
   const userId = new ObjectId();
-  const cfg = { cos: { prefix: 'movehome' } };
+  const cfg = { cos: { prefix: 'movehome' }, imageProcessingEnabled };
   const db = {
     collection() {
       return {
@@ -105,6 +105,36 @@ test('unsafe MIME downloads as octet-stream; never inline HTML or user supplied 
   node.cosKey = `movehome/users/${new ObjectId()}/originals/foreign`;
   const foreignKey = await ctx.app.inject({ url: base, headers: { 'x-test-user': String(ctx.userId) } });
   assert.equal(foreignKey.statusCode, 409);
+});
+
+test('thumbnail URL requires explicit opt-in and a small allowed image with owner permissions', async (t) => {
+  const disabled = createApp();
+  await disabled.ready();
+  t.after(() => disabled.app.close());
+  const original = file(disabled.userId, { size: 8 * 1024 * 1024 });
+  disabled.docs.push(original);
+  const path = `/api/v1/nodes/${original._id}/url?purpose=thumbnail`;
+  assert.equal((await disabled.app.inject({ url: path, headers: { 'x-test-user': String(disabled.userId) } })).statusCode, 503);
+  assert.equal(disabled.calls.length, 0);
+
+  const enabled = createApp({ imageProcessingEnabled: true });
+  await enabled.ready();
+  t.after(() => enabled.app.close());
+  const image = file(enabled.userId, { size: 8 * 1024 * 1024 });
+  enabled.docs.push(image);
+  const endpoint = `/api/v1/nodes/${image._id}/url?purpose=thumbnail`;
+  assert.equal((await enabled.app.inject({ url: endpoint })).statusCode, 401);
+  assert.equal((await enabled.app.inject({ url: endpoint, headers: { 'x-test-user': String(new ObjectId()) } })).statusCode, 404);
+  const result = await enabled.app.inject({ url: endpoint, headers: { 'x-test-user': String(enabled.userId) } });
+  assert.equal(result.statusCode, 200, result.body);
+  assert.equal(result.json().mime, 'image/jpeg');
+  assert.equal(result.headers['cache-control'], 'private, no-store');
+  assert.equal(enabled.calls[0].options.thumbnail, true);
+  image.mime = 'image/svg+xml';
+  assert.equal((await enabled.app.inject({ url: endpoint, headers: { 'x-test-user': String(enabled.userId) } })).statusCode, 422);
+  image.mime = 'image/jpeg';
+  image.size = 31 * 1024 * 1024;
+  assert.equal((await enabled.app.inject({ url: endpoint, headers: { 'x-test-user': String(enabled.userId) } })).statusCode, 422);
 });
 
 test('folder detail returns validated ancestor chain for direct navigation', async (t) => {

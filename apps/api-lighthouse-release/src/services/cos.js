@@ -68,7 +68,7 @@ export function createCosService(cfg) {
       return cosCall(client, 'headObject', { Bucket: bucket, Region: region, Key: key });
     },
 
-    async signReadUrl(key, { disposition, mime }) {
+    async signReadUrl(key, { disposition, mime, thumbnail = false, expires = 600 }) {
       const data = await cosCall(client, 'getObjectUrl', {
         Bucket: bucket,
         Region: region,
@@ -77,10 +77,11 @@ export function createCosService(cfg) {
         ...(readDomain ? { Domain: readDomain } : {}),
         Method: 'GET',
         Sign: true,
-        Expires: 600,
+        Expires: expires,
         Query: {
           'response-content-disposition': disposition,
           'response-content-type': mime,
+          ...(thumbnail ? { 'imageMogr2/thumbnail/320x320>/format/jpg/quality/80': '' } : {}),
         },
       });
       return data.Url;

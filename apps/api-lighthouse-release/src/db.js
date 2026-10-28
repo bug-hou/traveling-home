@@ -13,7 +13,12 @@ export async function connectDb(cfg) {
 
 async function ensureIndexes(db) {
   await db.collection('users').createIndex({ email: 1 }, { unique: true });
+  await db.collection('users').createIndex({ publicHandle: 1 }, { unique: true, partialFilterExpression: { publicHandle: { $type: 'string' } } });
+  await db.collection('handles').createIndex({ userId: 1 });
+  await db.collection('shares').createIndex({ userId: 1, slug: 1 }, { unique: true });
+  await db.collection('shares').createIndex({ userId: 1, createdAt: -1 });
   await db.collection('nodes').createIndex({ userId: 1, parentId: 1, deletedAt: 1 });
+  await db.collection('nodes').createIndex({ userId: 1, type: 1, status: 1, deletedAt: 1, uploadedAt: -1, _id: -1 });
 
   const uploadSessions = db.collection('upload_sessions');
   await uploadSessions.createIndex({ userId: 1, status: 1, expiresAt: 1 });

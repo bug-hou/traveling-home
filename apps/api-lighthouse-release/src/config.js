@@ -79,5 +79,6 @@ export function loadConfig(env = process.env) {
     accessTtlSeconds: int(env.ACCESS_TOKEN_TTL_SECONDS, 900),
     refreshTtlDays: int(env.REFRESH_TOKEN_TTL_DAYS, 30),
     cos: loadCosConfig(env),
+    imageProcessingEnabled: bool(env.COS_IMAGE_PROCESSING_ENABLED, false),
   });
 }
