@@ -98,7 +98,7 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
   async function validCover(share, coverNodeId) {
     if (!coverNodeId) return true;
     const cover = await activeNode(nodes, share.userId, coverNodeId);
-    return Boolean(cover?.type === 'file' && cover.status === 'ready' && COVER_MIME.has(cover.mime?.toLowerCase()) && await insideShare(nodes, share, coverNodeId));
+    return Boolean(cover?.type === 'file' && cover.status === 'ready' && cover.size > 0 && cover.size <= 2 * 1024 * 1024 && COVER_MIME.has(cover.mime?.toLowerCase()) && await insideShare(nodes, share, coverNodeId));
   }
 
   app.post('/shares', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
@@ -122,7 +122,7 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
       revokedAt: null, createdAt: now, updatedAt: now,
     };
     if (!share.allowPreview && !share.allowDownload) return fail(reply, 400, 'NO_ACCESS', '预览和下载至少开启一项');
-    if (!await validCover(share, share.coverNodeId)) return fail(reply, 400, 'INVALID_COVER', '封面须为分享范围内已就绪的图片');
+    if (!await validCover(share, share.coverNodeId)) return fail(reply, 400, 'INVALID_COVER', '封面须为分享范围内不超过 2 MiB 的图片');
     try { await shares.insertOne(share); } catch (error) {
       if (error?.code === 11000) return fail(reply, 409, 'SLUG_TAKEN', '此自定义路径已被使用');
       throw error;
@@ -147,7 +147,7 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     if (changes.allowPreview === false && !('allowDownload' in changes) && !current.allowDownload || changes.allowDownload === false && !('allowPreview' in changes) && !current.allowPreview) {
       return fail(reply, 400, 'NO_ACCESS', '预览和下载至少开启一项');
     }
-    if (!await validCover(current, changes.coverNodeId === undefined ? current.coverNodeId : changes.coverNodeId)) return fail(reply, 400, 'INVALID_COVER', '封面须为分享范围内已就绪的图片');
+    if (!await validCover(current, changes.coverNodeId === undefined ? current.coverNodeId : changes.coverNodeId)) return fail(reply, 400, 'INVALID_COVER', '封面须为分享范围内不超过 2 MiB 的图片');
     try {
       const updated = await shares.findOneAndUpdate(
         { _id, userId: req.user._id, revokedAt: null, ...(changes.maxDownloads == null ? {} : { downloadCount: { $lte: changes.maxDownloads } }) },

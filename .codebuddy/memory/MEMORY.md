@@ -9,7 +9,8 @@
 - 前端流程约定：用户先设计页面，确认后才实现对应的前端业务；本阶段已确认登录页设计，可继续后续素材/地图页面，但需按功能分步推进。
 - 品牌与登录稿：用户认可暂定品牌名「迹光」及登录稿，选定 Logo C「行迹」（虚线路径汇入定位点），位于 design/assets/logo.svg；用户后续自行替换图片素材。正式 PC/H5 认证页已在 apps/web 实现，剩余素材/地图业务页待设计与开发。首页静态稿需保持 PC 最近素材/最近旅行卡片等高、动画丰富但克制，并尊重 prefers-reduced-motion。
 - 后端：Node.js（Fastify 5，ESM，zod 校验，argon2id，jose JWT）；MongoDB 原生驱动；地图用腾讯地图 JS API GL，县级点亮用 2dsphere 判定。
-- 认证接口：`/api/v1/auth/{register,login,refresh,logout,change-password,me}`；前端统一 API client 在 `apps/web/src/services/api.ts`，所有会话请求 `credentials: include`，Cookie 由 API 设置为 HttpOnly；受保护路由由前端路由守卫处理，后端仍每次校验认证和资源归属。
+- 认证接口：`/api/v1/auth/{register,login,refresh,logout,change-password,me}`，另加 `PATCH /auth/handle` 设置全站唯一、可修改的公开用户名（旧别名保留，内部 Mongo `_id`/JWT `sub`/COS 路径不变）。
+- 分享与展示型活动页（2026-10-28 确认并本地实现）：只做展示，不接受访客投稿；公开链接采用固定 `share.convenience.top/{公开用户名}/{自定义路径}`，不用 `{用户名}.convenience.top`；下载限额按“签发下载链接次数”计数，不等于真实下载完成次数。数据集合 `shares` 与 `handles`；公开接口为 `POST /public/shares/:handle/:slug/browse` 和 `/files/:nodeId/access`；每次签发都按当前父链重新判定分享范围，撤销不能立即收回已签发链接。部署仍需单独做 DNS、证书与 nginx SPA 回退，主站 `/app/` 与分享域名分别用 `VITE_APP_BASE=/app/` 与 `/` 构建。前端统一 API client 在 `apps/web/src/services/api.ts`，所有会话请求 `credentials: include`，Cookie 由 API 设置为 HttpOnly；受保护路由由前端路由守卫处理，后端仍每次校验认证和资源归属。
 - 本地开发：Vite `/api` 代理默认目标 `https://api.convenience.top`，对生产 API 请求代设 Origin `https://convenience.top`；本地有效注册、改密、登出会影响线上账号。通过 `VITE_API_PROXY_TARGET` / `VITE_API_PROXY_ORIGIN` 可改为本地 Node API。部署 Makers 时设置 `VITE_API_BASE_URL=https://api.convenience.top`。
 - 存储：腾讯云 COS，桶 test-cos-1312827847（ap-chengdu，私有），统一前缀 movehome/users/{userId}/...；视频转码用数据万象。2026-10-28 用户已绑定自定义源站域名 `assets.convenience.top`（默认源站、HTTPS 证书、强制 HTTPS、上线）；实测 DNS CNAME 指向该桶默认域名、HTTPS 证书校验通过，匿名根路径返回 403 符合私有桶预期；文件访问仍需单独验证签名 URL。
 - 文件字节不经后端，浏览器直连 COS（STS 临时凭证 / 签名 URL）；预览/下载后端签名时需使用自定义域名 Host，桶保持私有。
