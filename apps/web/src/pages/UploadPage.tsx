@@ -4,6 +4,8 @@ import { Link, useBlocker, useBeforeUnload, useSearchParams } from 'react-router
 import { Button, Modal, Progress } from '@arco-design/web-react';
 import { IconRefresh } from '@arco-design/web-react/icon';
 import { ApiError } from '@/services/api';
+import { isPhoto, isVideo, parseAutomaticLocation } from '@/services/media-location';
+import type { AutomaticLocation, SelectedMedia } from '@/services/media-location';
 import { nodesApi } from '@/services/nodes';
 import type { NodeSummary } from '@/services/nodes';
 import { useAuth } from '@/features/auth/AuthProvider';
@@ -13,15 +15,18 @@ import '@/styles/upload.css';
 
 type UploadStatus = 'queued' | 'uploading' | 'paused' | 'registering' | 'completed' | 'failed' | 'registration_failed';
 
-interface UploadItem {
+interface UploadItem extends SelectedMedia {
   id: string;
-  file: File;
+  batchFiles: readonly SelectedMedia[];
   previewUrl: string | null;
   status: UploadStatus;
   progress: number;
   loaded: number;
   speed: number;
   credentials: UploadCredentials | null;
+  nodeId: string | null;
+  location: AutomaticLocation | null;
+  locationChecked: boolean;
   error: string;
 }
 
@@ -79,16 +84,20 @@ function filePreviewClass(file: File) {
   return 'upload-file-thumb upload-file-thumb--other';
 }
 
-function createQueueItem(file: File): UploadItem {
+function createQueueItem(media: SelectedMedia, batchFiles: readonly SelectedMedia[]): UploadItem {
   return {
     id: crypto.randomUUID(),
-    file,
-    previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+    ...media,
+    batchFiles,
+    previewUrl: media.file.type.startsWith('image/') ? URL.createObjectURL(media.file) : null,
     status: 'queued',
     progress: 0,
     loaded: 0,
     speed: 0,
     credentials: null,
+    nodeId: null,
+    location: null,
+    locationChecked: false,
     error: '',
   };
 }
@@ -211,7 +220,9 @@ export default function UploadPage() {
   function addFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList);
     if (files.length === 0) return;
-    const nextItems = files.map(createQueueItem);
+    const batchId = crypto.randomUUID();
+    const batchFiles = files.map((file) => ({ file, batchId }));
+    const nextItems = batchFiles.map((media) => createQueueItem(media, batchFiles));
     updateItems((current) => [...current, ...nextItems]);
     notify(`${files.length} 个文件已加入上传队列`);
   }
@@ -242,7 +253,10 @@ export default function UploadPage() {
 
         updateItem(item.id, { status: 'uploading', error: '', progress: 0, loaded: 0, speed: 0 });
         try {
-          await uploadSelectedFile(item.file, destination.id, {
+          const location = item.locationChecked ? item.location : await parseAutomaticLocation(item, item.batchFiles);
+          updateItem(item.id, { location, locationChecked: true });
+          if (cancelledItemsRef.current.has(item.id)) throw new UploadCancelledError();
+          const result = await uploadSelectedFile(item.file, destination.id, {
             onCredentials(credentials) {
               updateItem(item.id, { credentials });
             },
@@ -264,7 +278,7 @@ export default function UploadPage() {
             isCancelled() {
               return cancelledItemsRef.current.has(item.id);
             },
-          });
+          }, location);
           controllersRef.current.delete(item.id);
           pauseRequestedRef.current.delete(item.id);
           cancelledItemsRef.current.delete(item.id);
@@ -349,7 +363,7 @@ export default function UploadPage() {
   function retryItem(item: UploadItem) {
     if (item.status === 'registration_failed' && item.credentials) {
       updateItem(item.id, { status: 'registering', error: '' });
-      void retryUploadRegistration(item.credentials)
+      void retryUploadRegistration(item.credentials, item.location)
         .then(() => {
           updateItem(item.id, { status: 'completed', error: '' });
           notify(`${item.file.name} 已登记到云空间`);

@@ -26,8 +26,16 @@ const credentialsBody = z
     parentId: parentIdSchema.nullable().optional(),
   })
   .strict();
+const automaticLocationSchema = z.object({
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  source: z.enum(['exif', 'srt']),
+}).strict();
 const completeBody = z
-  .object({ uploadId: z.string().regex(/^[a-f\d]{24}$/i, '上传 ID 格式不正确') })
+  .object({
+    uploadId: z.string().regex(/^[a-f\d]{24}$/i, '上传 ID 格式不正确'),
+    location: automaticLocationSchema.optional(),
+  })
   .strict();
 
 function extensionFor(name) {
@@ -155,6 +163,13 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     const uploadId = new ObjectId(body.uploadId);
     const session = await sessions.findOne({ _id: uploadId, userId });
     if (!session) return fail(reply, 404, 'UPLOAD_SESSION_NOT_FOUND', '上传任务不存在或已过期');
+    if (body.location) {
+      const { name, mime } = session;
+      const matchesFile = body.location.source === 'exif'
+        ? /\.jpe?g$/i.test(name) && (mime === 'image/jpeg' || mime === 'application/octet-stream')
+        : /\.(mp4|mov)$/i.test(name) && (mime.startsWith('video/') || mime === 'application/octet-stream');
+      if (!matchesFile) return fail(reply, 400, 'INVALID_INPUT', '位置来源与上传文件格式不匹配');
+    }
 
     reply.header('Cache-Control', 'private, no-store');
     if (session.status === 'completed') {
@@ -207,6 +222,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       cosKey: session.cosKey,
       status: 'ready',
       uploadSessionId: session._id,
+      ...(body.location ? { mediaLocation: { ...body.location, placeName: null } } : {}),
       createdAt: now,
       updatedAt: now,
       uploadedAt: now,

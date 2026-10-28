@@ -1,5 +1,6 @@
 import COS from 'cos-js-sdk-v5';
 import { apiRequest } from './api';
+import type { AutomaticLocation } from './media-location';
 
 export interface UploadCredentialInput {
   name: string;
@@ -62,10 +63,10 @@ export const uploadsApi = {
     });
   },
 
-  complete(uploadId: string) {
+  complete(uploadId: string, location: AutomaticLocation | null = null) {
     return apiRequest<UploadCompleteResponse>('/api/v1/uploads/complete', {
       method: 'POST',
-      body: JSON.stringify({ uploadId }),
+      body: JSON.stringify({ uploadId, ...(location ? { location } : {}) }),
     });
   },
 };
@@ -99,6 +100,7 @@ export async function uploadSelectedFile(
     onRegistering(): void;
     isCancelled(): boolean;
   },
+  location: AutomaticLocation | null = null,
 ) {
   const credentials = await uploadsApi.requestCredentials({
     name: file.name,
@@ -116,14 +118,14 @@ export async function uploadSelectedFile(
 
   handlers.onRegistering();
   try {
-    return await uploadsApi.complete(credentials.uploadId);
+    return await uploadsApi.complete(credentials.uploadId, location);
   } catch (error) {
     throw new UploadRegistrationError(credentials, error);
   }
 }
 
-export function retryUploadRegistration(credentials: UploadCredentials) {
-  return uploadsApi.complete(credentials.uploadId);
+export function retryUploadRegistration(credentials: UploadCredentials, location: AutomaticLocation | null = null) {
+  return uploadsApi.complete(credentials.uploadId, location);
 }
 
 export function uploadDirectToCos(

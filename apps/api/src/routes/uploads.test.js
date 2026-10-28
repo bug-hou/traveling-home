@@ -276,3 +276,66 @@ test('upload sessions cannot be completed by another user', async (t) => {
   assert.equal(db.collection('nodes').documents.length, 0);
   assert.equal(cos.calls.head.length, 0);
 });
+
+test('completion saves automatic GPS once and never replaces a later manual location', async (t) => {
+  const { app, db } = await createApp({ cos: fakeCos() });
+  t.after(() => app.close());
+  const userId = new ObjectId();
+  const { uploadId, fileId } = (await requestCredentials(app, userId, { name: 'frame.JPG', mime: 'image/jpeg' })).json();
+  const complete = (location) => app.inject({
+    method: 'POST', url: '/api/v1/uploads/complete', headers: { 'x-test-user': String(userId) },
+    payload: { uploadId, location },
+  });
+  const first = await complete({ latitude: 0, longitude: -73.5, source: 'exif' });
+  assert.equal(first.statusCode, 200, first.body);
+  const node = db.collection('nodes').documents[0];
+  assert.equal(String(node._id), fileId);
+  assert.deepEqual(node.mediaLocation, { latitude: 0, longitude: -73.5, placeName: null, source: 'exif' });
+  node.mediaLocation = { latitude: 30, longitude: 120, placeName: '手动标记', source: 'manual' };
+  const repeated = await complete({ latitude: 50, longitude: 50, source: 'exif' });
+  assert.equal(repeated.statusCode, 200);
+  assert.equal(repeated.json().idempotent, true);
+  assert.deepEqual(node.mediaLocation, { latitude: 30, longitude: 120, placeName: '手动标记', source: 'manual' });
+});
+
+test('completion validates automatic GPS and binds SRT positions only to the matching owner session', async (t) => {
+  const { app, db } = await createApp({ cos: fakeCos() });
+  t.after(() => app.close());
+  const owner = new ObjectId();
+  const { uploadId } = (await requestCredentials(app, owner)).json();
+  const complete = (userId, location) => app.inject({
+    method: 'POST', url: '/api/v1/uploads/complete', headers: { 'x-test-user': String(userId) },
+    payload: { uploadId, location },
+  });
+  for (const location of [
+    { latitude: 91, longitude: 10, source: 'srt' },
+    { latitude: 20, longitude: -181, source: 'srt' },
+    { latitude: '20', longitude: 100, source: 'srt' },
+    { latitude: 20, longitude: 100, source: 'manual' },
+    { latitude: 20, longitude: 100, source: 'srt', placeName: 'injected' },
+  ]) {
+    assert.equal((await complete(owner, location)).statusCode, 400);
+  }
+  assert.equal(db.collection('nodes').documents.length, 0);
+  assert.equal((await complete(new ObjectId(), { latitude: 20, longitude: 100, source: 'srt' })).statusCode, 404);
+  const success = await complete(owner, { latitude: -3.5, longitude: 0, source: 'srt' });
+  assert.equal(success.statusCode, 200, success.body);
+  assert.deepEqual(db.collection('nodes').documents[0].mediaLocation, { latitude: -3.5, longitude: 0, placeName: null, source: 'srt' });
+});
+
+test('completion without GPS succeeds, and location sources cannot be attached to incompatible files', async (t) => {
+  const { app, db } = await createApp({ cos: fakeCos() });
+  t.after(() => app.close());
+  const owner = new ObjectId();
+  const srt = (await requestCredentials(app, owner, { name: 'clip.SRT', mime: 'application/octet-stream' })).json();
+  const photo = (await requestCredentials(app, owner, { name: 'photo.jpeg', mime: 'image/jpeg' })).json();
+  const complete = (uploadId, location) => app.inject({
+    method: 'POST', url: '/api/v1/uploads/complete', headers: { 'x-test-user': String(owner) },
+    payload: location ? { uploadId, location } : { uploadId },
+  });
+  assert.equal((await complete(srt.uploadId, { latitude: 10, longitude: 20, source: 'srt' })).statusCode, 400);
+  assert.equal((await complete(photo.uploadId, { latitude: 10, longitude: 20, source: 'srt' })).statusCode, 400);
+  assert.equal((await complete(srt.uploadId)).statusCode, 200);
+  assert.equal((await complete(photo.uploadId)).statusCode, 200);
+  assert.ok(db.collection('nodes').documents.every((node) => !Object.hasOwn(node, 'mediaLocation')));
+});
