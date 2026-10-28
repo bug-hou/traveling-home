@@ -148,7 +148,11 @@
     card.dataset.nodeId = node.id;
     card.draggable = true;
     if (node.type === 'folder') card.dataset.dropFolder = node.id;
-    const main = button('card-main', '', () => node.type === 'folder' ? navigate(node.id) : notify('文件预览需签名 URL 接口；此处不读取真实素材'));
+    const main = button('card-main', '', () => {
+      if (node.type === 'folder') { navigate(node.id); return; }
+      const demo = node.type === 'photo' ? (node.id === 'p-yading' ? 'located' : 'unlocated') : node.type === 'video' ? 'video' : node.type === 'audio' ? 'audio' : 'unsupported';
+      window.location.href = `preview.html?demo=${demo}`;
+    });
     main.setAttribute('aria-label', node.type === 'folder' ? `打开文件夹 ${node.name}` : `查看文件 ${node.name}`);
     const thumb = createThumb(node);
     const copy = make('span', 'card-copy');

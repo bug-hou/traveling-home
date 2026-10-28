@@ -19,10 +19,10 @@
 | `account` | `/settings/account` | 账号与安全设置 | `account.md` |
 | `upload` | `/upload` | 上传素材与队列（含失败重试） | `upload.md` |
 | `files` | `/files/:folderId?` | 文件浏览与管理、按需安全预览 | `files.md` |
-| `shares` | `/shares`、`/shares/new?targetId=...`、`/shares/:id/edit` | 分享管理与活动页配置 | `shares.md` |
-| `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 公开分享与活动展示 | `publicShare.md` |
+| `shares` | `/shares`、`/shares/new?targetId=...`、`/shares/:id/edit` | 网盘式分享管理、状态筛选及配置 | `shares.md` |
+| `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 公开目录浏览与活动作品展示 | `publicShare.md` |
 
-表中为应用内部路由；Lighthouse 部署在 `https://api.convenience.top/app/`，实际访问需在路由前添加 `/app`。本地开发仍使用根路径，不改变 pageId 和 Agent 埋点。
+表中为应用内部路由；Lighthouse 部署在 `https://api.convenience.top/app/`，实际访问需在路由前添加 `/app`。本地开发仍使用根路径，不改变 pageId 和 Agent 埋点。现有正式页面已对齐 `design/` 的白底细框简约风格；视觉调整不改变 Agent 埋点、权限边界或业务状态。
 
 ## 埋点规范（Agent 定位元素用，全站统一）
 

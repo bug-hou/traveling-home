@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Dropdown, Menu, Modal, Select } from '@arco-design/web-react';
+import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { nodesApi } from '@/services/nodes';
 import type { NodeAccess, NodeSort, NodeSummary } from '@/services/nodes';
@@ -324,16 +325,9 @@ export default function FilesPage() {
 
   return <div className="files-app">
     <aside className="files-sidebar" aria-label="主导航" data-agent-region="files.nav">
-      <Link to="/files" className="files-brand" data-agent-id="nav.files.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" />迹光</Link>
+      <Link to="/" className="files-brand" data-agent-id="nav.home.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" />迹光</Link>
       <small className="files-sidebar-caption">工作空间</small>
-      <nav aria-label="工作空间">
-        <Link to="/" data-agent-id="nav.home">⌂ <span>首页</span></Link>
-        <Link to="/files" className="active" aria-current="page" data-agent-id="nav.files" {...dropProps(null)}>▤ <span>全部文件</span></Link>
-        <button type="button" disabled data-agent-id="nav.map">⌖ <span>足迹地图</span></button>
-        <button type="button" disabled data-agent-id="nav.trips">▦ <span>旅行</span></button>
-        <Link to="/shares" data-agent-id="nav.shares">◇ <span>我的分享</span></Link>
-        <button type="button" disabled data-agent-id="nav.trash">⌫ <span>回收站</span></button>
-      </nav>
+      <WorkspaceNavigation rootDropProps={dropProps(null)} />
       <div className="files-quick"><small>快速访问</small>{path.slice(1).map((entry) => <Link key={entry.id} to={`/files/${entry.id}`} data-agent-id={`files.nav.folder.${entry.id}`} {...dropProps(entry.id)}>▤ {entry.name}</Link>)}</div>
       <Link className="files-profile" to="/settings/account" data-agent-id="nav.account"><span>{(user?.nickname || '旅').slice(0, 1)}</span><b>{user?.nickname || '个人空间'}</b><small>账号设置 →</small></Link>
     </aside>
@@ -370,7 +364,7 @@ export default function FilesPage() {
           <footer className="files-library-footer">文件仅你本人可见 · 排序与搜索由服务器处理</footer>
         </section><p className="files-footnote">素材保存在私有空间，预览链接按需签发并短期有效。</p>
       </div>
-      <nav className="files-mobile-nav" aria-label="移动端导航" data-agent-region="files.mobileNav"><Link to="/" data-agent-id="nav.mobile.home">⌂<small>首页</small></Link><Link to="/files" aria-current="page" data-agent-id="nav.mobile.files">▤<small>文件</small></Link><Link to="/upload" data-agent-id="nav.mobile.upload">↑<small>上传</small></Link><Link to="/settings/account" data-agent-id="nav.mobile.account">○<small>我的</small></Link></nav>
+      <WorkspaceMobileNavigation className="files-mobile-nav" region="files.mobileNav" />
     </main>
     {action && <Modal
       visible

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>素材预览与定位 · 迹光设计稿</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/preview.css" />
+</head>
+<body>
+  <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15m6-12v15"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4m-6.6 7 6.6 4.4"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M5 7l1 13h12l1-13M9 7V4h6v3"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m14 5-7 7 7 7M7 12h14"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 17v3h16v-3"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 20 4.5-1 11-11a2 2 0 0 0-3-3l-11 11L4 20Z"/><path d="m14 7 3 3"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.2"/></symbol>
+    <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 17 5-5 3 3 3-3 5 5"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 8 6 4-6 4z"/></symbol>
+    <symbol id="i-audio" viewBox="0 0 24 24"><path d="M9 17V6l11-2v11M9 17c0 3-6 3-6 0s6-3 6 0Zm11-2c0 3-6 3-6 0s6-3 6 0Z"/></symbol>
+  </svg>
+
+  <aside class="sidebar" aria-label="主导航">
+    <a class="brand" href="home.html"><img src="assets/logo.svg" alt="" /><span>迹光</span></a>
+    <p class="side-caption">工作空间</p>
+    <nav class="side-nav">
+      <a class="nav-item" href="home.html"><svg><use href="#i-home"/></svg>首页</a>
+      <a class="nav-item is-active" href="files.html" aria-current="page"><svg><use href="#i-folder"/></svg>全部文件</a>
+      <button class="nav-item" type="button" disabled title="足迹地图尚未设计"><svg><use href="#i-map"/></svg>足迹地图 · 准备中</button>
+      <button class="nav-item" type="button" disabled title="旅行页面尚未设计"><svg><use href="#i-calendar"/></svg>旅行 · 准备中</button>
+      <a class="nav-item" href="files.html" title="返回文件设计稿"><svg><use href="#i-share"/></svg>我的分享 · 查看文件稿</a>
+      <button class="nav-item" type="button" disabled title="回收站页面尚未设计"><svg><use href="#i-trash"/></svg>回收站 · 准备中</button>
+    </nav>
+    <div class="sidebar-bottom"><div class="privacy-card"><svg><use href="#i-shield"/></svg><span><strong>私密空间</strong><small>素材只属于你</small></span></div><div class="profile-row"><span class="avatar">旅</span><span><strong>个人空间</strong><small>预览设计稿</small></span></div></div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar"><div class="topbar-path"><span>WORKSPACE /</span><a href="files.html">全部文件</a><b>/</b><strong>素材预览</strong></div><span class="private-label"><svg><use href="#i-shield"/></svg> 私有素材</span></header>
+    <div class="preview-page">
+      <div class="page-top"><div><a href="files.html" class="back-link"><svg><use href="#i-back"/></svg> 返回全部文件</a><p class="eyebrow"><i></i> MOMENTS, WITH A PLACE</p><h1>每一帧，都有来处<span>.</span></h1><p class="page-subtitle">查看素材与拍摄信息，为未标记的旅途补上位置。</p></div><button id="download" class="download-btn" type="button"><svg><use href="#i-download"/></svg>下载原文件</button></div>
+      <div class="demo-switch" role="group" aria-label="设计稿示例状态"><span>切换示例</span><button type="button" data-demo="located" aria-pressed="true">已定位照片</button><button type="button" data-demo="unlocated" aria-pressed="false">未定位照片</button><button type="button" data-demo="video" aria-pressed="false">视频</button><button type="button" data-demo="audio" aria-pressed="false">音频</button><button type="button" data-demo="unsupported" aria-pressed="false">其他文件</button></div>
+      <div class="content-grid">
+        <section class="media-panel" aria-label="素材预览">
+          <div class="media-head"><div class="file-icon"><svg><use id="file-icon" href="#i-photo"/></svg></div><div class="file-heading"><span id="media-kind">照片 · 示例素材</span><h2 id="file-name">稻城亚丁 · 日落.jpg</h2></div><span id="file-tag" class="file-tag">JPG</span></div>
+          <div id="media-stage" class="media-stage stage-photo" data-mode="located"><div class="stage-image" aria-hidden="true"><span class="stage-sun"></span><span class="ridge ridge-back"></span><span class="ridge ridge-front"></span><span class="stage-water"></span></div><div id="stage-placeholder" class="stage-placeholder" hidden></div><span class="image-watermark">VISUAL PLACEHOLDER · 非真实照片</span><span id="stage-badge" class="stage-badge"><svg><use href="#i-pin"/></svg> 示例位置 · 已标记</span></div>
+          <div class="media-footer"><div class="stage-caption"><span class="stage-caption-icon"><svg><use href="#i-shield"/></svg></span><span><strong>只在你自己的空间里浏览</strong><small id="preview-hint">正式页面将按需请求短时效私有预览链接</small></span></div><span class="image-counter">01 / 01</span></div>
+        </section>
+
+        <div class="detail-column">
+          <section class="detail-card" aria-labelledby="detail-title"><div class="card-title"><span class="section-icon"><svg><use href="#i-info"/></svg></span><div><small>THE DETAILS</small><h2 id="detail-title">文件信息</h2></div></div><dl class="detail-list"><div><dt>文件类型</dt><dd id="meta-type">JPEG 图片</dd></div><div><dt>文件大小</dt><dd id="meta-size">48.0 MB</dd></div><div><dt>上传时间</dt><dd id="meta-upload">示例 · 10 月 27 日</dd></div><div><dt>拍摄时间</dt><dd>待解析</dd></div><div><dt>拍摄设备</dt><dd>待解析</dd></div></dl><div class="detail-foot">拍摄时间与设备需后续 EXIF / SRT 元数据解析支持。</div></section>
+          <section class="location-card" aria-labelledby="location-title"><div class="card-title"><span class="section-icon location-icon"><svg><use href="#i-pin"/></svg></span><div><small>WHERE IT HAPPENED</small><h2 id="location-title">拍摄位置</h2></div><span id="location-chip" class="location-chip">示例已定位</span></div><div class="map-art" role="img" aria-label="装饰性位置示意图，非真实地图或行政区边界"><div class="map-lines"></div><div class="map-route"></div><span id="map-pin" class="map-pin"><svg><use href="#i-pin"/></svg></span><span class="map-label">示意图 · 非真实地图/点位</span></div><div class="location-copy"><div><span class="location-eyebrow">当前位置</span><strong id="location-name">示例 · 稻城亚丁</strong><small id="location-coordinates">示例坐标：东经 100.30°，北纬 28.48°</small></div><button id="edit-location" type="button"><svg><use href="#i-edit"/></svg><span id="edit-label">修改位置</span></button></div><p class="location-help">手动标记仅在当前设计稿生效，不会生成真实足迹或点亮县区。</p></section>
+          <div class="next-step"><svg><use href="#i-map"/></svg><span><strong>足迹地图，即将从这里出发</strong><small>真实位置元数据和地图接口完成后，才会显示素材点位。</small></span></div>
+        </div>
+      </div>
+      <p class="page-note">独立交互原型 · 示例坐标、文件和图像均非当前账号数据 · 不调用任何 API</p>
+    </div>
+  </main>
+  <div id="editor" class="dialog-backdrop" hidden><div class="editor-dialog" role="dialog" aria-modal="true" aria-labelledby="editor-title"><div class="editor-header"><div><small>MARK THE MOMENT</small><h2 id="editor-title">手动标记位置</h2></div><button id="close-editor" class="icon-button" type="button" aria-label="关闭位置编辑"><svg><use href="#i-close"/></svg></button></div><p class="editor-intro">原型仅演示输入与校验，不连接腾讯地图，也不保存到云端。正式页面可在地图选点，并支持精确坐标。</p><div class="editor-map" role="img" aria-label="非真实地图的装饰背景，不能在此选点"><span class="editor-pin"><svg><use href="#i-pin"/></svg></span><span>地图选点待正式版接入 · 此处用坐标演示</span></div><form id="location-form" novalidate><label for="place-name">地点名称 <span>可选，仅用于显示</span></label><input id="place-name" name="name" type="text" maxlength="60" autocomplete="off" placeholder="例如：旅途中拍下的山谷" /><div class="coord-fields"><div><label for="longitude">经度 <span>−180 ～ 180</span></label><input id="longitude" name="longitude" type="number" step="any" min="-180" max="180" inputmode="decimal" placeholder="例如 100.30" required /></div><div><label for="latitude">纬度 <span>−90 ～ 90</span></label><input id="latitude" name="latitude" type="number" step="any" min="-90" max="90" inputmode="decimal" placeholder="例如 28.48" required /></div></div><p class="coord-note">坐标示例使用经度在前、纬度在后。原型不会推断行政区，也不会验证地名与坐标是否一致。</p><p id="form-error" class="form-error" role="alert" aria-live="polite"></p><div class="form-actions"><button id="cancel-editor" class="secondary-btn" type="button">取消</button><button class="primary-btn" type="submit">在本页标记位置</button></div></form></div></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/preview.js"></script>
+</body>
+</html>

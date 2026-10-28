@@ -20,4 +20,15 @@
     height: 100%;
     margin: 0;
   }
+
+  :root {
+    --j-ink: #202724;
+    --j-muted: #7e8984;
+    --j-accent: #267d70;
+    --j-line: #e9ece8;
+    --j-soft: #f8faf7;
+    --j-deep: #26352b;
+  }
+
+  body { background: #fff; }
 }

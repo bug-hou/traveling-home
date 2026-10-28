@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#f4f8f8" />
+  <meta name="theme-color" content="#ffffff" />
   <title>首页 · 迹光 设计稿</title>
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="assets/home.css" />
 </head>
 <body>
-  <div class="preview-note">页面原型 · 示例数据仅用于视觉预览，接入 API 后会换成当前账号数据</div>
   <div class="app-shell">
     <aside class="sidebar" aria-label="主导航">
       <a class="brand" href="#" aria-label="迹光首页"><img src="assets/logo.svg" alt="" /><span>迹光</span></a>
@@ -47,14 +46,13 @@
 
       <div class="dashboard">
         <section class="welcome-row">
-          <div><p class="eyebrow"><span class="sun">✦</span> <time id="today-label">TODAY</time></p><h1>早上好，<span class="demo-data">林间漫游</span><span class="empty-only">旅行者</span> <span>☀</span></h1><p class="welcome-sub">旅途的每一帧，都值得被好好收藏。</p></div>
-          <button class="quick-upload"><span>＋</span> 上传第一批素材</button>
+          <div><p class="eyebrow"><time id="today-label">TODAY</time><span class="eyebrow-separator">/</span> 个人工作空间</p><h1>你好，<span class="demo-data">林间漫游</span><span class="empty-only">旅行者</span>。</h1><p class="welcome-sub">照片、足迹与旅途，都在这里好好收藏。</p></div>
+          <span class="welcome-index">JIGUANG <span>—</span> YOUR JOURNEY, KEPT.</span>
         </section>
 
         <section class="hero-card">
-          <div class="hero-copy"><span class="hero-kicker"><i></i> 你的旅行素材空间</span><h2>把下一段旅程，<br />收进这里。</h2><p>照片、视频、航拍轨迹，一处归档。<br class="desktop-only" />从素材出发，把走过的地方慢慢点亮。</p><button class="hero-cta">开始上传 <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div>
-          <div class="hero-art" aria-hidden="true"><div class="orb orb-one"></div><div class="orb orb-two"></div><div class="hero-route"><svg viewBox="0 0 470 240"><path d="M28 202C91 190 103 145 169 152s75-64 128-53 74-54 143-67"/><circle cx="28" cy="202" r="5"/><circle cx="169" cy="152" r="5"/><circle cx="297" cy="99" r="5"/><circle cx="440" cy="32" r="6"/></svg></div><div class="floating-photo photo-back"><span class="photo-sun"></span><i></i><b></b><small>川西 · 日落时分</small></div><div class="floating-photo photo-front"><span class="photo-mountain"></span><i></i><small>稻城亚丁</small></div><div class="hero-pin"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div><div class="hero-chip"><span>✦</span> 每段旅程，都有迹可循</div></div>
-          <div class="hero-grain"></div>
+          <div class="hero-copy"><span class="hero-kicker">迹光 / 旅行素材空间</span><h2>走过的路，<br />值得被记住。</h2><p>收好每一帧风景，整理每一段旅途。<br class="desktop-only" />从这里开始，慢慢画出自己的旅行地图。</p><button class="hero-cta">开始整理 <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div>
+          <div class="hero-art" aria-hidden="true"><div class="hero-print"><div class="hero-landscape"><span class="landscape-sun"></span><span class="landscape-ridge landscape-ridge--back"></span><span class="landscape-ridge landscape-ridge--front"></span></div><div class="hero-print__caption"><span>01 / JOURNAL</span><span>让旅途，留在这里</span></div></div><span class="hero-art__index">COLLECT · REMEMBER · EXPLORE</span></div>
         </section>
 
         <section class="empty-onboarding" aria-label="开始使用" data-agent-region="home.onboarding">
@@ -108,6 +106,7 @@
         </section>
 
         <footer class="dashboard-footer">每一段旅程，都会成为你自己的地图。<span>数据仅存于你的私人空间</span></footer>
+        <p class="preview-note">页面原型 · 示例数据仅用于视觉预览，接入 API 后会换成当前账号数据</p>
       </div>
     </main>
   </div>

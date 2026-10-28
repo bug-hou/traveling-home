@@ -2,6 +2,7 @@ import { Modal } from '@arco-design/web-react';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { homeApi } from '@/services/home';
 import type { HomeSummary, ModuleStatus, RecentFile } from '@/services/home';
@@ -127,22 +128,17 @@ export default function HomePage() {
     <aside className="home-sidebar" data-agent-region="home.nav" aria-label="工作空间">
       <Link to="/" className="home-brand" data-agent-id="nav.home.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" />迹光</Link>
       <small className="home-caption">工作空间</small>
-      <nav aria-label="主导航">
-        <Link to="/" className="is-active" aria-current="page" data-agent-id="nav.home"><span aria-hidden="true">⌂</span>首页</Link>
-        <Link to="/files" data-agent-id="nav.files"><span aria-hidden="true">▤</span>全部文件</Link>
-        <button type="button" disabled data-agent-id="nav.map"><span aria-hidden="true">⌖</span>足迹地图 · 准备中</button>
-        <button type="button" disabled data-agent-id="nav.trips"><span aria-hidden="true">▦</span>旅行 · 准备中</button>
-      </nav>
+      <WorkspaceNavigation />
       <div className="home-sidebar-bottom">
         <div className="home-storage-mini"><span>云端空间</span><strong>{valueOrState(storage?.status, storage?.usedBytes == null ? null : formatBytes(storage.usedBytes))}</strong><small>已入库文件占用 · 暂无配额限制</small></div>
-        <Link to="/settings/account" className="home-profile" data-agent-id="home.profile.account"><span>{(user?.nickname || '旅').slice(0, 1)}</span><b>{user?.nickname || '个人空间'}</b><small>账号设置 →</small></Link>
+        <Link to="/settings/account" className="home-profile" data-agent-id="nav.account"><span>{(user?.nickname || '旅').slice(0, 1)}</span><b>{user?.nickname || '个人空间'}</b><small>账号设置 →</small></Link>
       </div>
     </aside>
     <main className="home-main">
       <header className="home-topbar" data-agent-region="home.header"><span className="home-breadcrumb">工作空间 / <b>首页</b></span><div className="home-topbar-actions"><form onSubmit={searchFiles} role="search"><input value={search} onChange={(event) => setSearch(event.target.value)} data-agent-id="home.header.search" aria-label="搜索文件名称" placeholder="搜索文件名称" maxLength={100} /><button type="submit" data-agent-id="home.header.searchSubmit" aria-label="搜索文件">⌕</button></form><Link to="/upload" className="home-upload" data-agent-id="home.header.upload">↑ <span>上传素材</span></Link></div></header>
       <div className="home-dashboard">
-        <section className="home-welcome" data-agent-region="home.welcome"><div><small>✦ &nbsp; {date}</small><h1>{greeting}，{user?.nickname || '旅行者'} <span>✦</span></h1><p>旅途的每一帧，都值得被好好收藏。</p></div>{firstUpload && <Link to="/upload" data-agent-id="home.welcome.upload">＋ 上传第一批素材</Link>}</section>
-        <section className="home-hero"><div className="home-hero-copy"><small>● &nbsp;你的旅行素材空间</small><h2>把下一段旅程，<br />收进这里。</h2><p>照片、视频、航拍轨迹，一处归档。<br />从素材出发，把走过的地方慢慢点亮。</p><Link to="/upload" data-agent-id="home.hero.upload">开始上传 <span>→</span></Link></div><div className="home-hero-art" aria-hidden="true"><div className="home-hero-orb" /><div className="home-hero-photo home-hero-photo--back"><i /></div><div className="home-hero-photo home-hero-photo--front"><i /></div><span className="home-hero-pin">⌖</span><small>✦ 每段旅程，都有迹可循</small></div></section>
+        <section className="home-welcome" data-agent-region="home.welcome"><div><small>{date} &nbsp; / &nbsp; 个人工作空间</small><h1>{greeting}，{user?.nickname || '旅行者'}。</h1><p>照片、足迹与旅途，都在这里好好收藏。</p></div>{firstUpload && <Link to="/upload" data-agent-id="home.welcome.upload">上传第一批素材 →</Link>}</section>
+        <section className="home-hero"><div className="home-hero-copy"><small>迹光 / 旅行素材空间</small><h2>走过的路，<br />值得被记住。</h2><p>收好每一帧风景，整理每一段旅途。<br />从这里开始，慢慢画出自己的旅行地图。</p><Link to="/upload" data-agent-id="home.hero.upload">开始整理 <span>→</span></Link></div><div className="home-hero-art" aria-hidden="true"><div className="home-hero-print"><div className="home-hero-landscape"><span className="home-hero-sun" /><span className="home-hero-ridge home-hero-ridge--back" /><span className="home-hero-ridge home-hero-ridge--front" /></div><div className="home-hero-print-caption"><span>01 / JOURNAL</span><span>让旅途，留在这里</span></div></div><small>COLLECT · REMEMBER · EXPLORE</small></div></section>
         {(error || storage?.status === 'unavailable' || files?.status === 'unavailable') && <div className="home-alert" role="alert">{error || '部分数据暂不可用'}<button type="button" onClick={retry} data-agent-id="home.summary.retry">重新加载</button></div>}
         {loading && <p className="home-status" role="status">正在汇总你的旅行素材…</p>}
         {firstUpload && <section className="home-onboarding" data-agent-region="home.onboarding"><span>↑</span><div><small>从这里开始</small><b>先上传一份旅行素材</b><p>上传完成后，首页会自动汇总空间和最近素材。</p></div><Link to="/upload" data-agent-id="home.onboarding.upload">选择素材上传 →</Link></section>}
@@ -161,7 +157,7 @@ export default function HomePage() {
         <footer className="home-footer">每一段旅程，都会成为你自己的地图。 <span>数据仅存于你的私人空间</span></footer>
       </div>
     </main>
-    <nav className="home-mobile-nav" aria-label="移动端导航" data-agent-region="home.nav"><Link to="/" aria-current="page" data-agent-id="nav.mobile.home">⌂<small>首页</small></Link><Link to="/files" data-agent-id="nav.mobile.files">▤<small>文件</small></Link><Link to="/upload" data-agent-id="nav.mobile.upload">↑<small>上传</small></Link><Link to="/settings/account" data-agent-id="nav.mobile.account">○<small>我的</small></Link></nav>
+    <WorkspaceMobileNavigation className="home-mobile-nav" region="home.nav" />
     {preview && <Modal visible className="home-preview-modal" getPopupContainer={getHomePopupContainer} data-agent-region="home.preview" title={preview.name} closable={false} footer={null} maskClosable={false} onCancel={closePreview}><button type="button" className="home-preview-close" aria-label="关闭预览" data-agent-id="home.preview.close" onClick={closePreview}>×</button><div className="home-preview-body" data-agent-ignore="true">{previewError && <p role="alert">{previewError}</p>}{!access && !previewError && <p>正在获取私有访问链接…</p>}{access && (access.previewable ? access.mime.startsWith('image/') ? <img src={access.url} alt={preview.name} referrerPolicy="no-referrer" onError={() => setPreviewError('图片无法加载，请下载原文件')} /> : access.mime.startsWith('video/') ? <video src={access.url} controls onError={() => setPreviewError('视频暂无法播放，请下载原文件')} /> : access.mime.startsWith('audio/') ? <audio src={access.url} controls onError={() => setPreviewError('音频暂无法播放，请下载原文件')} /> : null : <p>当前格式不支持在线预览，可以下载原文件。</p>)}</div><div className="home-preview-actions"><span>{formatBytes(preview.size)} · {fileKind(preview)}</span><button type="button" data-agent-id="home.preview.download" onClick={() => void download()}>下载原文件</button></div></Modal>}
   </div>;
 }

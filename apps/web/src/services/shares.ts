@@ -43,6 +43,19 @@ export interface PublicBrowse {
   offset: number;
 }
 
+export type ShareFilter = 'all' | 'active' | 'expired' | 'revoked';
+
+export function shareStatus(share: Share, now = Date.now()): Exclude<ShareFilter, 'all'> {
+  if (share.revokedAt) return 'revoked';
+  return share.expiresAt && Date.parse(share.expiresAt) <= now ? 'expired' : 'active';
+}
+
+export function filterShares(items: Share[], filter: ShareFilter, query: string, now = Date.now()) {
+  const keyword = query.trim().toLocaleLowerCase();
+  return items.filter((share) => (filter === 'all' || shareStatus(share, now) === filter)
+    && (!keyword || `${share.title} ${share.slug}`.toLocaleLowerCase().includes(keyword)));
+}
+
 export function shareLink(handle: string, slug: string) {
   const path = `${encodeURIComponent(handle)}/${encodeURIComponent(slug)}`;
   return import.meta.env.DEV ? `${window.location.origin}/s/${path}` : `https://share.convenience.top/${path}`;

@@ -188,8 +188,8 @@ export default function AuthPage() {
       <section className="auth-layout">
         <div className="auth-hero" data-agent-region="auth.hero">
           <p className="auth-eyebrow"><span /> 为旅行创作者而生</p>
-          <h1>把走过的路，<br /><em>点亮</em>成地图</h1>
-          <p className="auth-hero__description">照片、视频、航拍轨迹，安心收进一个地方。让每一份素材，都记得它来自哪段旅程。</p>
+          <h1>走过的路，<br /><em>值得被记住。</em></h1>
+          <p className="auth-hero__description">把旅途中的照片、视频与航拍素材好好收起。整理每一段故事，慢慢画出属于自己的旅行地图。</p>
           <JourneyArt />
           <div className="auth-hero__foot"><Icon name="shield" /> 私密存储 <span /> 大疆素材友好 <span /> 足迹自动归档</div>
         </div>

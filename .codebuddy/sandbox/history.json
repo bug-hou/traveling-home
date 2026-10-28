@@ -6,6 +6,18 @@
       "projectPath": "/Users/bughou/Desktop/console/movehome/apps/web/dist",
       "desc": "迹光分享/展示活动页静态前端（根路径构建），供 share.convenience.top 使用",
       "createdAt": 1793187338889
+    },
+    {
+      "spaceKey": "750d3792ae0d4747ba15411e49aa1f53",
+      "projectPath": "/Users/bughou/Desktop/console/movehome/apps/web/dist",
+      "desc": "迹光主站 /app/ 前端构建（含分享管理），用于更新 /var/www/movehome-app",
+      "createdAt": 1793188352411
+    },
+    {
+      "spaceKey": "061f4f9ae5d1464ba63a9a34b0481923",
+      "projectPath": "/Users/bughou/Desktop/console/movehome/apps/web/dist",
+      "desc": "迹光分享站根路径前端（重新构建，修复 chunk 版本不一致）",
+      "createdAt": 1793188534519
     }
   ]
 }

@@ -49,4 +49,5 @@
 - 认证接口使用 `credentials: include`；access/refresh Cookie 为 HttpOnly，浏览器脚本无法读取。
 - 启动时调用 `GET /api/v1/auth/me` 恢复登录态；access 过期时客户端单飞调用 `/refresh` 再重试。
 - 表单采用 Arco `Input`、`Input.Password`、`Button` 和 `Alert`，保持品牌布局与独立路由链接；密码显隐继续由有独立埋点的语义按钮控制。`data-agent-id` 与 `data-agent-ignore` 在 Arco 渲染后的原生输入节点上。
+- PC/H5 已使用与首页一致的白色画布、细边框、低饱和绿与深色按钮；“走过的路，值得被记住”及左侧旅行插画仅是品牌展示，不承载用户真实足迹。
 - 找回密码 API 尚未实现，所以页面不显示失效的“忘记密码”入口。

@@ -9,18 +9,24 @@
 
 | region | 内容 |
 |---|---|
-| `shares.header` | 品牌、文件页与账号页导航 |
-| `shares.list`、`shares.row.{shareId}` | 有效/过期/已取消分享与签发量、复制、打开、编辑、取消 |
-| `shares.editor` | 创建或编辑分享的展示、链接、访问规则、封面与保存 |
+| `shares.sidebar`、`shares.header`、`shares.mobileNav` | 桌面工作区侧栏/顶栏、手机固定底栏及文件/账号导航 |
+| `shares.overview` | 全部、生效中、累计访问概览 |
+| `shares.list`、`shares.filters`、`shares.row.{shareId}` | 分享状态分栏、名称/路径搜索、表格式列表；手机显示卡片操作 |
+| `shares.handle` | 尚未设置公开用户名时的入口 |
+| `shares.editor`、`shares.editorSummary` | 创建/编辑的分组表单与不含真实私有文件的设置概要 |
 | `shares.cover` | 活动展示从分享目录中的图片中选择封面 |
 
 ## 可执行动作
 
 | data-agent-id / 工具名 | 作用 | 参数 | 危险 |
 |---|---|---|---|
-| `shares.header.brand`、`.files`、`.back` | 返回文件或分享列表 | 无 | 否 |
+| `shares.header.brand`、`.files`、`.back` | 返回首页、文件空间或分享列表 | 无 | 否 |
+| `shares.sidebar.home`、`.files`、`.upload`、`.shares`、`.pickFiles`、`.profile` | 桌面工作区导航、选择分享对象及账号入口 | 无 | 否 |
+| `shares.mobile.home`、`.files`、`.shares`、`.account` | 手机底部导航 | 无 | 否 |
 | `shares.header.account`、`shares.handle.setup`、`shares.editor.setupHandle` | 前往公开用户名设置 | 无 | 否 |
-| `shares.empty.files` | 前往文件页选择分享对象 | 无 | 否 |
+| `shares.list.create`、`shares.empty.files` | 前往文件页选择分享对象 | 无 | 否 |
+| `shares.filters.all`、`.active`、`.expired`、`.revoked`、`.search` | 按状态及标题/路径筛选已加载分享 | 状态、关键词 | 否 |
+| `tool: filterShares/shareStatus` | 共用分享列表筛选与状态归类函数 | 分享条目、状态、关键词 | 否 |
 | `shares.row.{shareId}.copy`、`.open`、`.edit` | 复制、打开或编辑特定分享 | 分享 ID | 否 |
 | `shares.row.{shareId}.revoke` | 确认后取消分享，不删除文件 | 分享 ID | 是 |
 | `shares.editor.standard`、`.activity`、`.title`、`.description` | 选择简洁/活动模式，设置文案 | 标题/介绍 | 否 |
@@ -36,7 +42,8 @@
 
 | 状态 | 含义 | 来源 |
 |---|---|---|
-| `shares` | 当前用户最多 200 条分享，含已取消项 | `GET /api/v1/shares` |
+| `shares` / `activeCount` | 当前用户最多 200 条分享、其中生效的数量 | `GET /api/v1/shares`，本地状态推导 |
+| `listFilter` / `listQuery` / `filteredShares` | 状态分栏、标题/路径关键词与当前可见列表（空结果不作空账户） | 页面状态及 `filterShares` |
 | `target` / `selected` | 分享目标或当前编辑中的分享 | 节点详情或分享列表 |
 | `mode` / `allowPreview` / `allowDownload` | 展示样式与访问规则 | 表单状态 |
 | `downloadCount` / `maxDownloads` | 签发链接次数 / 总额度，非 COS 真实完成下载数 | 分享列表 |
@@ -48,6 +55,7 @@
 
 ## 特殊说明
 
+- 桌面版采用与首页一致的白色细框侧栏 + 分享概览 + 可筛选的表格式列表，手机隐藏侧栏并提供固定底部导航；单行操作在手机改为 2×2 按钮区，埋点不变。配置页采用分组表单与右侧设置概要（不展示或请求私有素材）；手机底部提供保存栏。
 - 提取码输入 `data-agent-ignore`，原提取码不回显；取消分享标为危险操作。已签发的 COS 链接最久约 60 秒内仍有效。
 - 封面仅支持活动页分享范围内已就绪、不超过 2 MiB 的 JPEG/PNG/GIF/WebP 图片；封面浏览当前每级最多 100 项。活动页只能展示，不接受访客投稿。访问者已经看到的预览无法被浏览器禁止保存。
 - 通用输入与操作使用 Arco `Input`、`Input.Password` 和 `Button`（已有账号页实测真实输入/按钮埋点）；日期时间使用原生 `datetime-local`，明确按访客设备本地时区转换为 ISO，避免日期选择器的时区歧义。特色作品卡与目录封面选择器为业务组件。

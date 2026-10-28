@@ -10,7 +10,7 @@
 | region | 位置 | 内容 |
 |---|---|---|
 | `home.header` | 顶部 | 文件名称搜索、上传素材 |
-| `home.nav` | PC 侧栏 / H5 底栏 | 首页、文件、上传、个人空间；未实现的足迹/旅行入口禁用 |
+| `home.nav` | PC 侧栏 / H5 底栏 | PC 与文件页共用首页、全部文件、足迹地图、旅行、我的分享、回收站菜单；H5 共用首页、文件、上传、我的底栏；足迹/旅行/回收站禁用 |
 | `home.welcome` | 主区顶部 | 当前日期、当前用户昵称、欢迎文案与首次上传入口 |
 | `home.onboarding` | 已确认为零文件时 | 首次上传引导，不显示编造的统计 |
 | `home.overview` | 欢迎区之后 | 已入库素材数、真实用量；足迹/旅行准备中 |
@@ -27,10 +27,11 @@
 |---|---|---|---|---|
 | `nav.home.brand`、`nav.home`、`nav.mobile.home` | 链接 | 回到首页 | 无 | 否 |
 | `nav.files`、`nav.mobile.files`、`home.recentFiles.all` | 链接 | 打开文件页 | 无 | 否 |
-| `nav.map`、`nav.trips` | 禁用按钮 | 足迹/旅行待实现，不能误跳转 | 无 | 否 |
+| `nav.map`、`nav.trips`、`nav.trash` | 禁用按钮 | 足迹/旅行/回收站待实现，不能误跳转 | 无 | 否 |
+| `nav.shares` | 链接 | 打开我的分享管理页 | 无 | 否 |
 | `home.header.search`、`home.header.searchSubmit` | 输入/提交 | 用文件或文件夹名称搜索并跳转到文件页 | query | 否 |
 | `home.header.upload`、`home.hero.upload`、`home.welcome.upload`、`home.onboarding.upload`、`nav.mobile.upload` | 链接 | 进入已有上传页 | 无 | 否 |
-| `home.profile.account`、`nav.mobile.account` | 链接 | 账号设置 | 无 | 否 |
+| `nav.account`、`nav.mobile.account` | 链接 | 账号设置 | 无 | 否 |
 | `home.storage.viewFiles` | 链接 | 查看已入库文件 | 无 | 否 |
 | `home.recentFiles.open.{nodeId}` | 按钮 | 按需预览真实最近文件 | nodeId | 否 |
 | `home.preview.close`、`home.preview.download` | 按钮 | 关闭弹层/重新签名下载原片 | nodeId | 否 |
@@ -51,7 +52,7 @@
 ## 跳转
 
 - 未登录访问 `/` 会转到 `/login`；成功登录后保留并返回原受保护路径。
-- 可前往：文件、上传、账号设置；足迹地图、旅行列表、分享列表尚未实现，没有可点击入口。
+- 可前往：文件、我的分享、上传、账号设置；足迹地图、旅行列表和回收站仍禁用。
 - 登录用户访问 `/login` 或 `/register` 会转到 `/`。
 
 ## 特殊说明
@@ -60,5 +61,5 @@
 - 汇总 API 只返回当前用户的数据，不暴露 COS Key、对象存储内部 key 或长期访问 URL。
 - 短期签名 URL 仅在需要展示对应私有素材时提供；首页缩略图数量应限制。
 - 数据空状态与后端能力未就绪是不同状态，不能用同一个零值表达。
-- 设计原型 `design/home.html` 的示例数据是虚构的；它的地图是示意插画、明确不是行政边界数据。
+- 正式页视觉已对齐确认的简约设计稿：白底留白、细边框、低饱和绿和山景相纸；相纸纯 CSS 装饰，绝不代表真实用户图片。设计原型 `design/home.html` 的示例数据是虚构的，地图是示意插画、不是行政边界数据；正式页仍按实际 API 显示真实统计和“准备中”状态。
 - 当前本地 `/` 为 React 首页，`/settings/account` 为账号页；首页汇总与缩略图签名后端已在 Lighthouse 上线，前端新版本待通过 Makers 部署。图片不超过 2 MiB 时卡片可按需使用签名原图；2–30 MiB 的缩略图需经云端 CI 验收并启用 `COS_IMAGE_PROCESSING_ENABLED` 才能显示，失败回退图标，绝不回退加载大原图。
