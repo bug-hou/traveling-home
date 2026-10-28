@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Dropdown, Input, Menu, Modal, Select } from '@arco-design/web-react';
 import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { nodesApi } from '@/services/nodes';
+import { currentPagePath } from '@/services/navigation';
 import type { NodeSort, NodeSummary } from '@/services/nodes';
 import '@/styles/files.css';
 
@@ -133,7 +134,8 @@ function FileThumbnail({ node }: { node: NodeSummary }) {
 export default function FilesPage() {
   const { folderId } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const pageLocation = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('q')?.trim() ?? '';
   const { user } = useAuth();
   const [path, setPath] = useState<Folder[]>([{ id: null, name: '全部文件' }]);
@@ -162,6 +164,7 @@ export default function FilesPage() {
   const searchRef = useRef<HTMLInputElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const currentFolder = folderId ?? null;
+  const from = currentPagePath(pageLocation.pathname, pageLocation.search);
   const target = targetPath[targetPath.length - 1];
 
   useEffect(() => {
@@ -176,9 +179,18 @@ export default function FilesPage() {
   useEffect(() => { setInput(initialSearch); setQuery(initialSearch); }, [initialSearch]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setQuery(input.trim()), 280);
+    const timer = window.setTimeout(() => {
+      const nextQuery = input.trim();
+      setQuery(nextQuery);
+      if (nextQuery !== initialSearch) {
+        const nextParams = new URLSearchParams(searchParams);
+        if (nextQuery) nextParams.set('q', nextQuery);
+        else nextParams.delete('q');
+        setSearchParams(nextParams, { replace: true });
+      }
+    }, 280);
     return () => window.clearTimeout(timer);
-  }, [input]);
+  }, [input, initialSearch, searchParams, setSearchParams]);
 
   useEffect(() => { setItems([]); setOffset(0); setMenuId(null); }, [currentFolder, query, sort]);
 
@@ -297,12 +309,11 @@ export default function FilesPage() {
       <small className="files-sidebar-caption">工作空间</small>
       <WorkspaceNavigation rootDropProps={dropProps(null)} />
       <div className="files-quick"><small>快速访问</small>{path.slice(1).map((entry) => <Link key={entry.id} to={`/files/${entry.id}`} data-agent-id={`files.nav.folder.${entry.id}`} {...dropProps(entry.id)}>▤ {entry.name}</Link>)}</div>
-      <Link className="files-profile" to="/settings/account" data-agent-id="nav.account"><span>{(user?.nickname || '旅').slice(0, 1)}</span><b>{user?.nickname || '个人空间'}</b><small>账号设置 →</small></Link>
     </aside>
     <main className="files-main">
-      <header className="files-topbar" data-agent-region="files.header"><span>WORKSPACE / <b>全部文件</b></span><Link to="/settings/account" data-agent-id="files.header.account" aria-label="账号设置">{(user?.nickname || '旅').slice(0, 1)}</Link></header>
+      <header className="files-topbar" data-agent-region="files.header"><span>工作空间 / <b>全部文件</b></span><Link to="/settings/account" state={{ from }} data-agent-id="files.header.account" aria-label="账号设置">{(user?.nickname || '旅').slice(0, 1)}</Link></header>
       <div className="files-content">
-        <section className="files-heading"><div><small>YOUR TRAVEL LIBRARY</small><h1>全部文件<span>.</span></h1><p>把旅途中的每一帧，放在容易找到的地方。</p></div><Link className="files-upload" to={`/upload${currentFolder ? `?parentId=${currentFolder}` : ''}`} data-agent-id="files.header.upload">↑ 上传素材</Link></section>
+        <section className="files-heading"><div><small>YOUR TRAVEL LIBRARY</small><h1>全部文件<span>.</span></h1><p>把旅途中的每一帧，放在容易找到的地方。</p></div><Link className="files-upload" to={`/upload${currentFolder ? `?parentId=${currentFolder}` : ''}`} state={{ from }} data-agent-id="files.header.upload">↑ 上传素材</Link></section>
         <div className="files-intro" data-agent-region="files.intro"><span className="files-folder-symbol">▤</span><div><b>让好素材，住进好目录。</b><small>站内文件可拖入文件夹或上方路径；上传本地文件请点击「上传素材」。</small></div></div>
         <section className="files-section-heading" data-agent-region="files.breadcrumbs"><div><nav aria-label="文件夹路径">{path.map((entry, index) => <span key={entry.id ?? 'root'}>{index > 0 && ' / '}{index === path.length - 1 ? <strong>{entry.name}</strong> : <Link to={entry.id ? `/files/${entry.id}` : '/files'} data-agent-id={`files.path.${entry.id ?? 'root'}`} {...dropProps(entry.id)}>{entry.name}</Link>}</span>)}</nav><h2>{query ? '搜索结果' : path[path.length - 1]?.name === '全部文件' ? '我的文件' : path[path.length - 1]?.name}</h2><small>{query ? '按文件名搜索所有目录' : '当前目录'}</small></div><button type="button" data-agent-id="files.toolbar.createFolder" onClick={() => openAction({ kind: 'create' })}>＋ 新建文件夹</button></section>
         <section className="files-library" aria-label="文件管理" data-agent-region="files.library">
@@ -315,10 +326,10 @@ export default function FilesPage() {
           <div className="files-count" role="status">{loading && offset === 0 ? '正在加载…' : error ? '加载失败' : query ? `搜索「${query}」 · ${total} 项（按名称排序）` : `当前目录 · ${total} 项`}</div>
           {error && <div className="files-error" role="alert">{error}<button type="button" data-agent-id="files.library.retry" onClick={refresh}>重试</button><Link to="/files" data-agent-id="files.library.goRoot">回到根目录</Link></div>}
           {!error && items.length > 0 && <><div className={`files-items ${view === 'grid' ? 'files-items--grid' : 'files-items--list'}`}>{items.map((node) => <article key={node.id} className={`files-card ${dragOver === node.id ? 'files-card--drag' : ''}`} draggable onDragStart={(event) => { event.dataTransfer.setData('application/x-movehome-node', node.id); event.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDragOver(null)} {...(node.type === 'folder' ? dropProps(node.id) : {})} data-agent-region={`files.row.${node.id}`}>
-            <button type="button" className="files-card-main" data-agent-id={`files.row.${node.id}.open`} onClick={() => navigate(node.type === 'folder' ? `/files/${node.id}` : `/preview/${node.id}`)}>{node.type === 'file' && node.status === 'ready' && CARD_IMAGE_MIMES.has(node.mime?.toLowerCase() ?? '') && node.size > 0 && node.size <= CARD_IMAGE_THUMBNAIL_MAX_BYTES ? <FileThumbnail node={node} /> : <span className={`files-thumb files-thumb--${kind(node)}`}><span aria-hidden="true">{node.type === 'folder' ? '▤' : kind(node) === '视频' ? '▶' : kind(node) === '音频' ? '♫' : '▧'}</span><small>{kind(node)}</small></span>}<span className="files-card-copy"><b title={node.name}>{node.name}</b><small>{node.type === 'folder' ? '文件夹 · 点击打开' : `${formatSize(node.size)} · ${new Date(node.uploadedAt || node.updatedAt).toLocaleDateString('zh-CN')}`}</small></span>{view === 'list' && <span className="files-list-size">{node.type === 'folder' ? '—' : formatSize(node.size)}</span>}</button>
+            <button type="button" className="files-card-main" data-agent-id={`files.row.${node.id}.open`} onClick={() => navigate(node.type === 'folder' ? `/files/${node.id}` : `/preview/${node.id}`, { state: node.type === 'file' ? { from } : undefined })}>{node.type === 'file' && node.status === 'ready' && CARD_IMAGE_MIMES.has(node.mime?.toLowerCase() ?? '') && node.size > 0 && node.size <= CARD_IMAGE_THUMBNAIL_MAX_BYTES ? <FileThumbnail node={node} /> : <span className={`files-thumb files-thumb--${kind(node)}`}><span aria-hidden="true">{node.type === 'folder' ? '▤' : kind(node) === '视频' ? '▶' : kind(node) === '音频' ? '♫' : '▧'}</span><small>{kind(node)}</small></span>}<span className="files-card-copy"><b title={node.name}>{node.name}</b><small>{node.type === 'folder' ? '文件夹 · 点击打开' : `${formatSize(node.size)} · ${new Date(node.uploadedAt || node.updatedAt).toLocaleDateString('zh-CN')}`}</small></span>{view === 'list' && <span className="files-list-size">{node.type === 'folder' ? '—' : formatSize(node.size)}</span>}</button>
             <Dropdown trigger="click" position="br" popupVisible={menuId === node.id} onVisibleChange={(visible) => setMenuId(visible ? node.id : null)} getPopupContainer={getFilesPopupContainer} droplist={
               <Menu className="files-action-menu" data-agent-region={`files.row.${node.id}.menu`} onClickMenuItem={(key) => {
-                if (key === 'share') { setMenuId(null); navigate(`/shares/new?targetId=${node.id}`); }
+                if (key === 'share') { setMenuId(null); navigate(`/shares/new?targetId=${node.id}`, { state: { from } }); }
                 if (key === 'rename' || key === 'move' || key === 'delete') openAction({ kind: key, node });
               }}>
                 <Menu.Item key="share" wrapper="button" data-agent-id={`files.row.${node.id}.share`}>分享文件{node.type === 'folder' ? '夹' : ''}</Menu.Item>
@@ -328,7 +339,7 @@ export default function FilesPage() {
               </Menu>
             }><button type="button" className="files-more" aria-label={`${node.name}的更多操作`} data-agent-label={`${node.name}的更多操作`} aria-expanded={menuId === node.id} aria-haspopup="menu" data-agent-id={`files.row.${node.id}.more`}>•••</button></Dropdown>
           </article>)}</div>{items.length < total && <button type="button" className="files-more-pages" data-agent-id="files.library.loadMore" disabled={loading} onClick={() => setOffset(items.length)}>加载更多（{items.length}/{total}）</button>}</>}
-          {!error && !loading && total === 0 && <div className="files-empty"><span className="files-folder-symbol">▤</span><h3>{query ? '没有找到匹配的文件' : currentFolder ? '这个文件夹还是空的' : '这里还没有文件'}</h3><p>{query ? '换个文件名试试，目前仅支持按名称搜索。' : '创建文件夹，或者上传第一份旅途素材。'}</p>{!query && <div><button type="button" data-agent-id="files.empty.createFolder" onClick={() => openAction({ kind: 'create' })}>新建文件夹</button><Link to={`/upload${currentFolder ? `?parentId=${currentFolder}` : ''}`} data-agent-id="files.empty.upload">上传素材 →</Link></div>}</div>}
+          {!error && !loading && total === 0 && <div className="files-empty"><span className="files-folder-symbol">▤</span><h3>{query ? '没有找到匹配的文件' : currentFolder ? '这个文件夹还是空的' : '这里还没有文件'}</h3><p>{query ? '换个文件名试试，目前仅支持按名称搜索。' : '创建文件夹，或者上传第一份旅途素材。'}</p>{!query && <div><button type="button" data-agent-id="files.empty.createFolder" onClick={() => openAction({ kind: 'create' })}>新建文件夹</button><Link to={`/upload${currentFolder ? `?parentId=${currentFolder}` : ''}`} state={{ from }} data-agent-id="files.empty.upload">上传素材 →</Link></div>}</div>}
           <footer className="files-library-footer">文件仅你本人可见 · 排序与搜索由服务器处理</footer>
         </section><p className="files-footnote">素材保存在私有空间，预览链接按需签发并短期有效。</p>
       </div>

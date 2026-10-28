@@ -3,6 +3,7 @@ import test from 'node:test';
 import Fastify from 'fastify';
 import { ObjectId } from 'mongodb';
 import uploadRoutes from './uploads.js';
+import nodeRoutes from './nodes.js';
 
 function same(left, right) {
   if (left instanceof ObjectId || right instanceof ObjectId) return String(left) === String(right);
@@ -64,6 +65,7 @@ async function createApp({ cos = null, configured = true } = {}) {
       : null,
   };
   await app.register(uploadRoutes, { prefix: '/api/v1', cfg, db, requireAuth, cos });
+  await app.register(nodeRoutes, { prefix: '/api/v1', cfg, db, requireAuth, cos });
   return { app, db };
 }
 
@@ -291,11 +293,24 @@ test('completion saves automatic GPS once and never replaces a later manual loca
   const node = db.collection('nodes').documents[0];
   assert.equal(String(node._id), fileId);
   assert.deepEqual(node.mediaLocation, { latitude: 0, longitude: -73.5, placeName: null, source: 'exif' });
-  node.mediaLocation = { latitude: 30, longitude: 120, placeName: '手动标记', source: 'manual' };
+  const locationUrl = `/api/v1/nodes/${fileId}/location`;
+  const read = () => app.inject({ method: 'GET', url: locationUrl, headers: { 'x-test-user': String(userId) } });
+  assert.deepEqual((await read()).json().location, node.mediaLocation);
+  const manual = await app.inject({
+    method: 'PATCH', url: locationUrl, headers: { 'x-test-user': String(userId) },
+    payload: { latitude: 30, longitude: 120, placeName: '手动标记' },
+  });
+  assert.equal(manual.statusCode, 200);
+  assert.equal(manual.json().location.source, 'manual');
   const repeated = await complete({ latitude: 50, longitude: 50, source: 'exif' });
   assert.equal(repeated.statusCode, 200);
   assert.equal(repeated.json().idempotent, true);
-  assert.deepEqual(node.mediaLocation, { latitude: 30, longitude: 120, placeName: '手动标记', source: 'manual' });
+  assert.deepEqual((await read()).json().location, { latitude: 30, longitude: 120, placeName: '手动标记', source: 'manual' });
+  db.collection('upload_sessions').documents[0].status = 'pending';
+  const duplicateInsert = await complete({ latitude: 50, longitude: 50, source: 'exif' });
+  assert.equal(duplicateInsert.statusCode, 200);
+  assert.equal(duplicateInsert.json().idempotent, true);
+  assert.deepEqual((await read()).json().location, { latitude: 30, longitude: 120, placeName: '手动标记', source: 'manual' });
 });
 
 test('completion validates automatic GPS and binds SRT positions only to the matching owner session', async (t) => {

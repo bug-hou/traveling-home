@@ -9,7 +9,8 @@
 
 | region | 位置 | 内容 |
 |---|---|---|
-| `account.header` | 顶部 | 品牌入口、退出登录 |
+| `account.nav`、`account.mobileNav` | 侧栏/底栏 | 与工作空间同一套主菜单，当前项为“我的” |
+| `account.header` | 顶部 | 工作区面包屑、退出登录、返回原工作区页面入口 |
 | `account.profile` | 主区上方 | 当前用户邮箱、昵称、角色、登录状态 |
 | `account.next` | 主区中部 | 前往文件空间或上传素材页面 |
 | `account.handle` | 主区 | 设置全站唯一、可修改的公开分享用户名并查看分享 |
@@ -20,7 +21,8 @@
 
 | data-agent-id / 工具名 | 类型 | 作用 | 参数 | 危险 |
 |---|---|---|---|---|
-| `account.header.brand` | 点击 | 返回首页 | 无 | 否 |
+| `nav.home.brand`、`nav.*`、`nav.mobile.*` | 点击 | 打开工作区一级菜单，当前项为“我的” | 无 | 否 |
+| `account.header.back` | 点击 | 返回进入账号页前的站内页面；直接访问时回首页 | 无 | 否 |
 | `account.header.logout` | 点击 | 调用 `POST /api/v1/auth/logout` 并清除本地用户态 | 无 | 否 |
 | `account.next.openFiles` | 点击 | 前往 `/files` 浏览当前用户的文件 | 无 | 否 |
 | `account.next.openUpload` | 点击 | 前往 `/upload` 开始添加素材 | 无 | 否 |
@@ -45,7 +47,7 @@
 
 ## 跳转
 
-- 未登录访问本页会跳到 `/login`，登录成功后返回原受保护路径。
+- 未登录访问本页会跳到 `/login`，登录成功后返回原受保护路径和查询参数；从其它工作区进入可用 `account.header.back` 返回原页面，直接访问则返回首页。
 - 退出 API 成功后清除本地认证状态并前往 `/login`；网络失败时保留当前会话并提示重试，不假装已退出。
 
 ## 特殊说明

@@ -9,7 +9,7 @@
 
 | region | 内容 |
 |---|---|
-| `files.nav`、`files.mobileNav` | PC 与首页共用首页、全部文件、足迹地图、旅行、我的分享、回收站菜单；H5 共用首页、文件、上传、我的底栏；足迹/旅行/回收站禁用。当前文件夹快速访问仍为文件页专属 |
+| `files.nav`、`files.mobileNav` | 统一工作空间菜单，当前项为文件；桌面含禁用的足迹/旅行/回收站，手机显示首页/文件/上传/分享/我的；当前目录快速访问及根目录拖放仍专属文件页 |
 | `files.header`、`files.intro` | 账号入口、上传入口与整理提示 |
 | `files.breadcrumbs` | 当前目录路径与新建文件夹 |
 | `files.library`、`files.toolbar`、`files.row.{nodeId}` | 搜索/排序、视图切换、分页节点与单项操作；合格图片在接近视口时显示原图预览 |
@@ -50,8 +50,8 @@
 ## 跳转
 
 - 从 `/upload` 和账号页进入 `/files`，也可直接访问 `/files/:folderId`（通过服务端核对目录祖先）。
-- 前往 `/upload?parentId=...` 上传当前目录；点击文件进入 `/preview/:nodeId`，其“返回所在目录”链接从真实父目录恢复；前往 `/settings/account` 管理账号。
-- 未登录访问受保护路由会跳到 `/login`，成功后返回原路径。
+- 前往 `/upload?parentId=...` 上传当前目录；文件搜索条件同步在 URL `?q=`，点击文件进入 `/preview/:nodeId`、选择分享进入 `/shares/new?targetId=...` 时传入当前路径与搜索参数，返回优先回原目录或搜索结果；直接访问预览时才回文件真实父目录。前往 `/settings/account` 时也保留来源。
+- 未登录访问受保护路由会跳到 `/login`，成功后返回原路径及查询参数。
 
 ## 特殊说明
 

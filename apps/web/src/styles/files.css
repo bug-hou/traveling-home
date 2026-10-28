@@ -98,6 +98,8 @@
 @media(max-width:370px){.files-content{padding-right:14px;padding-left:14px}.files-card-copy b{font-size:12px}}
 .files-search { min-width: 0; transition: border-color .18s, box-shadow .18s; }
 .files-search:focus-within { border-color: var(--j-accent); box-shadow: 0 0 0 3px rgb(38 125 112 / 12%); }
+.files-sidebar .workspace-nav :is(a,button){color:#636d68}
+.files-sidebar .workspace-nav a[aria-current=page]{color:#234c42}
 .files-search .arco-input-group-wrapper { min-width: 0; flex: 1; width: 100%; background: transparent; }
 .files-search .arco-input-inner-wrapper, .files-search .arco-input-inner-wrapper:hover, .files-search .arco-input-inner-wrapper-focus { height: 100%; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .files-search .arco-input-group-prefix { padding: 0 8px 0 0; background: transparent; color: #87988d; font-size: 20px; }

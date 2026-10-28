@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
+import { navigationSource, returnLabel, returnTarget } from '@/services/navigation';
 import { Button, Input } from '@arco-design/web-react';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { nodesApi } from '@/services/nodes';
@@ -22,9 +24,13 @@ export default function SharesPage() {
   const [params] = useSearchParams();
   const targetId = params.get('targetId');
   const editing = Boolean(id);
-  const creating = !editing && Boolean(targetId);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const pageLocation = useLocation();
+  const creating = !editing && pageLocation.pathname.endsWith('/shares/new');
+  const missingTarget = creating && !targetId;
+  const editorBack = creating ? returnTarget((pageLocation.state as { from?: unknown } | null)?.from, '/shares') : '/shares';
+  const editorBackLabel = creating && editorBack !== '/shares' ? `返回${returnLabel(editorBack)}` : '返回分享列表';
   const [shares, setShares] = useState<Share[]>([]);
   const [listFilter, setListFilter] = useState<ShareFilter>('all');
   const [listQuery, setListQuery] = useState('');
@@ -56,7 +62,9 @@ export default function SharesPage() {
     let active = true;
     setLoading(true);
     setError('');
-    Promise.all([sharesApi.list(), targetId ? nodesApi.detail(targetId) : Promise.resolve(null)]).then(([list, detail]) => {
+    setTarget(null);
+    setSelected(null);
+    Promise.all([sharesApi.list(), creating && targetId ? nodesApi.detail(targetId) : Promise.resolve(null)]).then(([list, detail]) => {
       if (!active) return;
       setShares(list.items);
       if (detail) {
@@ -86,7 +94,7 @@ export default function SharesPage() {
     }).catch((cause: unknown) => { if (active) setError(message(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [id, targetId]);
+  }, [id, targetId, creating]);
 
   const filteredShares = useMemo(() => filterShares(shares, listFilter, listQuery), [shares, listFilter, listQuery]);
   const activeCount = shares.filter((share) => shareStatus(share) === 'active').length;
@@ -139,26 +147,22 @@ export default function SharesPage() {
 
   return <div className="share-workspace">
     <aside className="share-sidebar" aria-label="工作空间侧栏" data-agent-region="shares.sidebar">
-      <Link to="/" className="share-brand" data-agent-id="shares.header.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" /><strong>迹光</strong><span>个人空间</span></Link>
+      <Link to="/" className="share-brand" data-agent-id="nav.home.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" /><strong>迹光</strong><span>个人空间</span></Link>
       <span className="share-sidebar-caption">我的空间</span>
-      <nav aria-label="主导航" className="share-side-nav">
-        <Link to="/" data-agent-id="shares.sidebar.home"><span aria-hidden="true">⌂</span>首页</Link>
-        <Link to="/files" data-agent-id="shares.sidebar.files"><span aria-hidden="true">▤</span>全部文件</Link>
-        <Link to="/upload" data-agent-id="shares.sidebar.upload"><span aria-hidden="true">↑</span>上传素材</Link>
-        <Link to="/shares" className="is-current" aria-current="page" data-agent-id="shares.sidebar.shares"><span aria-hidden="true">◇</span>我的分享</Link>
-      </nav>
+      <WorkspaceNavigation />
       <div className="share-sidebar-note"><span aria-hidden="true">✦</span><b>把旅途分享出去</b><p>选择文件或文件夹，给你的作品一个专属入口。</p><Link to="/files" data-agent-id="shares.sidebar.pickFiles">选择文件 →</Link></div>
-      <Link to="/settings/account" className="share-sidebar-profile" data-agent-id="shares.sidebar.profile"><span>{(user?.nickname || '旅').slice(0, 1)}</span><b>{user?.nickname || '个人空间'}</b><small>账号设置 →</small></Link>
+
     </aside>
     <div className="share-main">
-      <header className="share-top" data-agent-region="shares.header"><span>工作空间 <span aria-hidden="true">/</span> <b>我的分享</b></span><nav><Link to="/files" data-agent-id="shares.header.files">全部文件</Link><Link to="/settings/account" data-agent-id="shares.header.account" aria-label="账号设置" className="share-header-avatar">{(user?.nickname || '旅').slice(0, 1)}</Link></nav></header>
+      <header className="share-top" data-agent-region="shares.header"><span>工作空间 <span aria-hidden="true">/</span> <b>{creating ? '创建分享' : editing ? '编辑分享' : '我的分享'}</b></span><nav><Link to="/files" data-agent-id="shares.header.files">全部文件</Link><Link to="/settings/account" state={navigationSource(pageLocation.pathname, pageLocation.search, pageLocation.state)} data-agent-id="shares.header.account" aria-label="账号设置" className="share-header-avatar">{(user?.nickname || '旅').slice(0, 1)}</Link></nav></header>
       <main className="share-container">
-        <div className="share-heading"><div><small>SHARING / 迹光云空间</small><h1>{creating ? '创建分享' : editing ? '编辑分享' : '我的分享'}</h1><p>{creating || editing ? '设置专属链接、访问权限与作品展示方式。' : '查看你的分享状态，把每一份精彩妥善送达。'}</p></div><Link to={creating || editing ? '/shares' : '/files'} className="share-back" data-agent-id="shares.header.back">{creating || editing ? '← 返回分享列表' : '前往文件空间 →'}</Link></div>
+        <div className="share-heading"><div><small>SHARING / 迹光云空间</small><h1>{creating ? '创建分享' : editing ? '编辑分享' : '我的分享'}</h1><p>{creating || editing ? '设置专属链接、访问权限与作品展示方式。' : '查看你的分享状态，把每一份精彩妥善送达。'}</p></div><Link to={creating || editing ? editorBack : '/files'} className="share-back" data-agent-id="shares.header.back">{creating || editing ? `← ${editorBackLabel}` : '前往文件空间 →'}</Link></div>
+      {missingTarget && <div className="share-alert" role="alert">请先从文件空间选择要分享的文件或文件夹。 <Link to="/files" data-agent-id="shares.editor.pickFiles">去选择文件 →</Link></div>}
       {loading && <p role="status">正在加载分享设置…</p>}
       {error && <div className="share-alert" role="alert">{error}</div>}
       {notice && <div className="share-success" role="status">{notice}</div>}
-      {!loading && !creating && !editing && <>
-        {!user?.publicHandle && <section className="share-setup" data-agent-region="shares.handle"><div><strong>先设置公开用户名</strong><p>为你的分享创建一个独一无二的地址，账号内部 ID 不会公开。</p></div><Link className="share-primary" to="/settings/account" data-agent-id="shares.handle.setup">设置用户名 →</Link></section>}
+      {!loading && !creating && !editing && !missingTarget && <>
+        {!user?.publicHandle && <section className="share-setup" data-agent-region="shares.handle"><div><strong>先设置公开用户名</strong><p>为你的分享创建一个独一无二的地址，账号内部 ID 不会公开。</p></div><Link className="share-primary" to="/settings/account" state={navigationSource(pageLocation.pathname, pageLocation.search, pageLocation.state)} data-agent-id="shares.handle.setup">设置用户名 →</Link></section>}
         <section className="share-overview" aria-label="分享概览" data-agent-region="shares.overview"><div><span>全部分享</span><strong>{shares.length}</strong><small>已创建的链接</small></div><div><span>生效中</span><strong>{activeCount}</strong><small>可继续访问</small></div><div><span>累计访问</span><strong>{shares.reduce((total, share) => total + share.viewCount, 0)}</strong><small>已记录的打开次数</small></div></section>
         <section className="share-list" aria-label="分享列表" data-agent-region="shares.list">
           <div className="share-list-toolbar"><div><h2>分享文件</h2><p>集中管理链接与权限 · 共 {shares.length} 项</p></div><Link to="/files" className="share-primary" data-agent-id="shares.list.create">＋ 创建分享</Link></div>
@@ -190,16 +194,11 @@ export default function SharesPage() {
         </section>
         </div>
         <aside className="share-editor-aside" aria-label="分享设置概要" data-agent-region="shares.editorSummary"><div className="share-summary-card"><small>页面预览 · {mode === 'activity' ? '活动展示' : '文件分享'}</small><div className="share-summary-visual" aria-hidden="true">{mode === 'activity' ? '✦' : '▤'}</div><h2>{title.trim() || '你的分享标题'}</h2><p>{description.trim() || (mode === 'activity' ? '用照片与故事呈现旅途的精彩。' : '打开链接，就能浏览你分享的文件。')}</p><div className="share-summary-tags"><span>{requireLogin ? '需要登录' : '链接可访问'}</span><span>{password || selected?.hasPassword && !removePassword ? '需要提取码' : '无需提取码'}</span><span>{allowDownload ? '允许下载' : '仅供预览'}</span></div></div><div className="share-summary-help"><b>链接将会显示为</b><p>share.convenience.top/{user?.publicHandle ?? '用户名'}/{slug.trim().toLowerCase() || '自动生成路径'}</p><small>仅作为设置预览，保存后才能访问。</small></div></aside>
-        <div className="share-submit"><span>所有变更需要保存后才会生效。</span><div><Link to="/shares" data-agent-id="shares.editor.cancel">取消</Link><Button type="primary" htmlType="submit" size="large" loading={busy} disabled={busy || !user?.publicHandle} data-agent-id="shares.editor.submit">{editing ? '保存设置' : '创建分享'}</Button></div></div>
-        {!user?.publicHandle && <p className="share-setup-required"><Link to="/settings/account" data-agent-id="shares.editor.setupHandle">请先设置公开用户名 →</Link></p>}
+        <div className="share-submit"><span>所有变更需要保存后才会生效。</span><div><Link to={editorBack} data-agent-id="shares.editor.cancel">取消</Link><Button type="primary" htmlType="submit" size="large" loading={busy} disabled={busy || !user?.publicHandle} data-agent-id="shares.editor.submit">{editing ? '保存设置' : '创建分享'}</Button></div></div>
+        {!user?.publicHandle && <p className="share-setup-required"><Link to="/settings/account" state={navigationSource(pageLocation.pathname, pageLocation.search, pageLocation.state)} data-agent-id="shares.editor.setupHandle">请先设置公开用户名 →</Link></p>}
       </form>}
       </main>
-      <nav className="share-mobile-nav" aria-label="移动端导航" data-agent-region="shares.mobileNav">
-        <Link to="/" data-agent-id="shares.mobile.home">⌂<small>首页</small></Link>
-        <Link to="/files" data-agent-id="shares.mobile.files">▤<small>文件</small></Link>
-        <Link to="/shares" aria-current="page" data-agent-id="shares.mobile.shares">◇<small>分享</small></Link>
-        <Link to="/settings/account" data-agent-id="shares.mobile.account">○<small>我的</small></Link>
-      </nav>
+      <WorkspaceMobileNavigation className="share-mobile-nav" region="shares.mobileNav" />
     </div>
   </div>;
 }

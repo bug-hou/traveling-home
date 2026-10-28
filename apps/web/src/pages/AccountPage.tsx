@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
+import { navigationSource, returnLabel, returnTarget } from '@/services/navigation';
 import { Alert, Button, Input } from '@arco-design/web-react';
 import { ApiError } from '@/services/api';
 import { useAuth } from '@/features/auth/AuthProvider';
@@ -9,6 +11,11 @@ import '@/styles/account.css';
 export default function AccountPage() {
   const { user, logout, changePassword, changeHandle } = useAuth();
   const navigate = useNavigate();
+  const pageLocation = useLocation();
+  const candidate = returnTarget((pageLocation.state as { from?: unknown } | null)?.from, '/');
+  const backPath = candidate.startsWith('/settings/account') ? '/' : candidate;
+  const previousFrom = returnTarget((pageLocation.state as { previousFrom?: unknown } | null)?.previousFrom, '');
+  const backState = previousFrom && !previousFrom.startsWith('/settings/account') && previousFrom !== backPath ? { from: previousFrom } : undefined;
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -82,14 +89,19 @@ export default function AccountPage() {
 
   return (
     <main className="account-page">
+      <aside className="account-sidebar" aria-label="工作空间侧栏" data-agent-region="account.nav">
+        <Link to="/" className="account-side-brand" data-agent-id="nav.home.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" />迹光</Link>
+        <small className="account-side-caption">工作空间</small>
+        <WorkspaceNavigation />
+      </aside>
+      <div className="account-main">
       <header className="account-topbar" data-agent-region="account.header">
-        <Link className="account-brand" to="/" aria-label="迹光" data-agent-id="account.header.brand">
-          <img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" /><b>迹光</b><span>旅行素材网盘</span>
-        </Link>
+        <span className="account-breadcrumb">工作空间 / <b>我的账号</b></span>
         <Button className="account-logout" htmlType="button" data-agent-id="account.header.logout" onClick={handleLogout} loading={logoutBusy} disabled={logoutBusy} aria-disabled={logoutBusy}>{logoutBusy ? '正在退出…' : '退出登录'}</Button>
       </header>
 
       <div className="account-content">
+        <Link className="account-back" to={backPath} state={backState} data-agent-id="account.header.back">← 返回{returnLabel(backPath)}</Link>
         {logoutError && <Alert className="account-alert" type="error" content={logoutError} role="alert" />}
         <div className="account-intro">
           <p className="account-eyebrow">你的旅程，从这里开始</p>
@@ -106,7 +118,7 @@ export default function AccountPage() {
         <section className="account-next">
           <div className="account-next__icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none"><rect x="4" y="4" width="40" height="40" rx="13" fill="currentColor" opacity=".1"/><path d="M13 30.5 20 23l5 4 9-11" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="34" cy="16" r="3" fill="currentColor"/><path d="M13 35h22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div>
           <div><h2>开始整理你的旅行素材</h2><p>在文件空间浏览和整理已上传的照片、视频与音频。</p></div>
-          <div className="account-next__actions"><Link className="account-next__link" to="/files" data-agent-id="account.next.openFiles">查看文件 <span aria-hidden="true">→</span></Link><Link className="account-next__link" to="/upload" data-agent-id="account.next.openUpload">开始上传 <span aria-hidden="true">↑</span></Link></div>
+          <div className="account-next__actions"><Link className="account-next__link" to="/files" data-agent-id="account.next.openFiles">查看文件 <span aria-hidden="true">→</span></Link><Link className="account-next__link" to="/upload" state={navigationSource(pageLocation.pathname, pageLocation.search, pageLocation.state)} data-agent-id="account.next.openUpload">开始上传 <span aria-hidden="true">↑</span></Link></div>
         </section>
 
         <section className="account-security" data-agent-region="account.handle">
@@ -134,6 +146,8 @@ export default function AccountPage() {
           )}
         </section>
       </div>
+      </div>
+      <WorkspaceMobileNavigation className="account-mobile-nav" region="account.mobileNav" />
     </main>
   );
 }

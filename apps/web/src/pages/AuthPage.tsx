@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Alert, Button, Input } from '@arco-design/web-react';
 import { ApiError } from '@/services/api';
 import { useAuth } from '@/features/auth/AuthProvider';
+import { returnTarget } from '@/services/navigation';
 import '@/styles/auth.css';
 
 type IconName = 'mail' | 'lock' | 'user' | 'eye' | 'eyeOff' | 'pin' | 'cloud' | 'video' | 'layers' | 'shield';
@@ -141,7 +142,7 @@ export default function AuthPage() {
         await login(email.trim().toLowerCase(), password);
       }
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from !== '/login' && from !== '/register' ? from : '/', { replace: true });
+      navigate(returnTarget(from, '/'), { replace: true });
     } catch (error) {
       if (error instanceof ApiError) {
         if (error.code === 'REGISTRATION_CLOSED') {

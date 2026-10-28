@@ -124,6 +124,8 @@
 .upload-queue-row--completed .upload-file-progress .arco-progress-line-inner { background: #62b89b; }
 .upload-file-progress-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; color: #a0adaf; font-size: 7px; }
 .upload-file-progress-meta span:first-child { overflow-wrap: anywhere; }
+.upload-preview-link { display: inline-block; margin-top: 5px; color: #117e74; font-size: 11px; font-weight: 650; }
+.upload-preview-link:hover { text-decoration: underline; }
 .upload-queue-row--failed .upload-file-progress-meta span:first-child, .upload-queue-row--registration_failed .upload-file-progress-meta span:first-child { color: #bd7668; }
 .upload-row-controls { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
 .upload-row-action { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #9aa9aa; font-size: 19px; line-height: 1; }
@@ -345,3 +347,9 @@
 @media(max-width:980px){.upload-sidebar{width:76px}.upload-main{margin-left:76px}}
 @media(max-width:700px){.upload-sidebar{display:none}.upload-main{margin-left:0}.upload-topbar{height:57px;padding:0 18px}.upload-content{padding:28px 18px 38px}.upload-heading h1{font-size:26px}.upload-heading p{font-size:12px}.upload-back-link{border-color:var(--j-line);border-radius:7px}.upload-destination{min-height:65px;margin-bottom:13px}.upload-dropzone{min-height:260px}.upload-dropzone h2{font-size:19px}.upload-dropzone p{font-size:11px}.upload-lower-grid{gap:13px}.upload-queue-card,.upload-tips-card{padding:17px;border-radius:9px}.upload-queue-title b{font-size:15px}.upload-file-title>b{font-size:12px}.upload-file-meta,.upload-file-progress-meta{font-size:10px}.upload-mobile-nav{border-color:var(--j-line);background:#ffffffed}.upload-mobile-nav .is-active{color:#326a51}}
 @media(max-width:370px){.upload-content{padding-right:14px;padding-left:14px}.upload-queue-card,.upload-tips-card{padding:12px}}
+.upload-sidebar .workspace-nav{width:100%}
+.upload-sidebar .workspace-nav :is(a,button){color:#636d68}
+.upload-sidebar .workspace-nav a[aria-current=page]{background:#f2f5f2;color:#234c42}
+@media(max-width:980px) and (min-width:701px){.upload-sidebar .workspace-nav{margin-top:37px}}
+.upload-mobile-nav a{align-content:center}
+.upload-mobile-nav a[aria-current=page]{color:#326a51}

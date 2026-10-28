@@ -13,13 +13,14 @@
 
 | pageId | 路由 | 页面 | 文件 |
 |---|---|---|---|
+| `_shell` | 登录后的私有工作区 | 统一桌面/移动菜单、页面归属和来源返回规则 | `_shell.md` |
 | `home` | `/` | 首页/仪表盘（真实素材及空间数据） | `home.md` |
 | `login` | `/login` | 登录 | `login.md` |
 | `register` | `/register` | 注册 | `register.md` |
 | `account` | `/settings/account` | 账号与安全设置 | `account.md` |
-| `upload` | `/upload` | 上传素材与队列（含失败重试） | `upload.md` |
+| `upload` | `/upload` | 上传素材与队列（新素材 GPS 自动识别、失败重试） | `upload.md` |
 | `files` | `/files/:folderId?` | 文件浏览与管理，打开文件进入详情 | `files.md` |
-| `preview` | `/preview/:nodeId` | 私有素材预览与手动位置标记 | `preview.md` |
+| `preview` | `/preview/:nodeId` | 私有素材预览、自动位置来源与手动标记 | `preview.md` |
 | `shares` | `/shares`、`/shares/new?targetId=...`、`/shares/:id/edit` | 网盘式分享管理、状态筛选及配置 | `shares.md` |
 | `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 公开目录浏览与活动作品展示 | `publicShare.md` |
 

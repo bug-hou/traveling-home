@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
-import { Link, useBlocker, useBeforeUnload, useSearchParams } from 'react-router-dom';
+import { Link, useBlocker, useBeforeUnload, useLocation, useSearchParams } from 'react-router-dom';
+import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
+import { navigationSource, returnLabel, returnTarget } from '@/services/navigation';
 import { Button, Modal, Progress } from '@arco-design/web-react';
 import { IconRefresh } from '@arco-design/web-react/icon';
 import { ApiError } from '@/services/api';
@@ -105,7 +107,13 @@ function createQueueItem(media: SelectedMedia, batchFiles: readonly SelectedMedi
 export default function UploadPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const pageLocation = useLocation();
   const initialParentId = searchParams.get('parentId');
+  const fallbackPath = initialParentId && /^[a-f\d]{24}$/i.test(initialParentId) ? `/files/${initialParentId}` : '/files';
+  const candidate = returnTarget((pageLocation.state as { from?: unknown } | null)?.from, fallbackPath);
+  const entryPath = candidate.startsWith('/upload') ? fallbackPath : candidate;
+  const previousFrom = returnTarget((pageLocation.state as { previousFrom?: unknown } | null)?.previousFrom, '');
+  const entryState = previousFrom && previousFrom !== entryPath && !previousFrom.startsWith('/upload') ? { from: previousFrom } : undefined;
   const [items, setItems] = useState<UploadItem[]>([]);
   const itemsRef = useRef(items);
   const [destination, setDestination] = useState<DirectoryEntry>({ id: null, name: '全部文件' });
@@ -282,7 +290,7 @@ export default function UploadPage() {
           controllersRef.current.delete(item.id);
           pauseRequestedRef.current.delete(item.id);
           cancelledItemsRef.current.delete(item.id);
-          updateItem(item.id, { status: 'completed', progress: 100, loaded: item.file.size, speed: 0, error: '' });
+          updateItem(item.id, { status: 'completed', nodeId: result.node.id, progress: 100, loaded: item.file.size, speed: 0, error: '' });
           notify(`${item.file.name} 已安全保存到云空间`);
         } catch (error) {
           controllersRef.current.delete(item.id);
@@ -364,8 +372,8 @@ export default function UploadPage() {
     if (item.status === 'registration_failed' && item.credentials) {
       updateItem(item.id, { status: 'registering', error: '' });
       void retryUploadRegistration(item.credentials, item.location)
-        .then(() => {
-          updateItem(item.id, { status: 'completed', error: '' });
+        .then((result) => {
+          updateItem(item.id, { status: 'completed', nodeId: result.node.id, error: '' });
           notify(`${item.file.name} 已登记到云空间`);
         })
         .catch((error: unknown) => {
@@ -373,7 +381,7 @@ export default function UploadPage() {
         });
       return;
     }
-    updateItem(item.id, { status: 'queued', progress: 0, loaded: 0, speed: 0, credentials: null, error: '' });
+    updateItem(item.id, { status: 'queued', progress: 0, loaded: 0, speed: 0, credentials: null, nodeId: null, error: '' });
     window.setTimeout(startQueue, 0);
   }
 
@@ -471,38 +479,27 @@ export default function UploadPage() {
   return (
     <div className="upload-app">
       <aside className="upload-sidebar" aria-label="主导航" data-agent-region="upload.nav">
-        <Link className="upload-brand" to="/upload" aria-label="迹光上传" data-agent-id="upload.nav.brand">
+        <Link className="upload-brand" to="/" aria-label="迹光首页" data-agent-id="nav.home.brand">
           <img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" /><span>迹光</span>
         </Link>
         <p className="upload-side-caption">工作空间</p>
-        <nav className="upload-side-nav" aria-label="工作空间">
-          <Link to="/" className="upload-nav-item" data-agent-id="nav.home"><span aria-hidden="true">⌂</span>首页</Link>
-          <Link to="/files" className="upload-nav-item" data-agent-id="nav.files"><span aria-hidden="true">▤</span>全部文件</Link>
-          <button type="button" className="upload-nav-item" disabled aria-disabled="true" data-agent-id="nav.map"><span aria-hidden="true">⌖</span>足迹地图</button>
-          <button type="button" className="upload-nav-item" disabled aria-disabled="true" data-agent-id="nav.trips"><span aria-hidden="true">▦</span>旅行</button>
-          <button type="button" className="upload-nav-item" disabled aria-disabled="true" data-agent-id="nav.shares"><span aria-hidden="true">↗</span>我的分享</button>
-          <button type="button" className="upload-nav-item" disabled aria-disabled="true" data-agent-id="nav.trash"><span aria-hidden="true">⌫</span>回收站</button>
-          <Link to="/upload" className="upload-nav-item is-active" aria-current="page" data-agent-id="nav.upload"><span aria-hidden="true">↑</span>上传素材</Link>
-        </nav>
+        <WorkspaceNavigation />
         <div className="upload-sidebar-bottom">
           <div className="upload-privacy-card"><span aria-hidden="true">◆</span><div><b>私密空间</b><small>仅你本人可访问</small></div></div>
-          <Link className="upload-profile-link" to="/settings/account" data-agent-id="upload.nav.account">
-            <span className="upload-avatar">{(user?.nickname || user?.email || '旅').slice(0, 1)}</span>
-            <span className="upload-profile-copy"><b>{user?.nickname || '旅行者'}</b><small>账号设置</small></span><span aria-hidden="true">›</span>
-          </Link>
+
         </div>
       </aside>
 
       <main className="upload-main">
         <header className="upload-topbar" data-agent-region="upload.header">
-          <div className="upload-breadcrumb"><Link to="/files" data-agent-id="upload.header.workspace">全部文件</Link><span>/</span><strong>上传素材</strong></div>
-          <div className="upload-top-actions"><span className="upload-secure-label"><span aria-hidden="true">◆</span>私密传输</span><Link className="upload-top-avatar" to="/settings/account" aria-label="账号设置" data-agent-id="upload.header.account">{(user?.nickname || user?.email || '旅').slice(0, 1)}</Link></div>
+          <div className="upload-breadcrumb"><Link to="/" data-agent-id="upload.header.workspace">工作空间</Link><span>/</span><strong>上传素材</strong></div>
+          <div className="upload-top-actions"><span className="upload-secure-label"><span aria-hidden="true">◆</span>私密传输</span><Link className="upload-top-avatar" to="/settings/account" state={navigationSource(pageLocation.pathname, pageLocation.search, pageLocation.state)} aria-label="账号设置" data-agent-id="upload.header.account">{(user?.nickname || user?.email || '旅').slice(0, 1)}</Link></div>
         </header>
 
         <section className="upload-content">
           <div className="upload-heading" data-agent-region="upload.intro">
             <div><span className="upload-eyebrow"><i /> YOUR TRAVEL LIBRARY</span><h1>上传素材</h1><p>把相机、无人机和旅途中的文件，安心收进迹光。</p></div>
-            <Link className="upload-back-link" to={destination.id ? `/files/${destination.id}` : '/files'} aria-label="返回文件" data-agent-id="upload.header.back" data-agent-label="返回文件">← <span>返回文件</span></Link>
+            <Link className="upload-back-link" to={entryPath} state={entryState} data-agent-id="upload.header.back">← <span>返回{returnLabel(entryPath)}</span></Link>
           </div>
 
           <section className="upload-destination" data-agent-region="upload.destination">
@@ -573,9 +570,10 @@ export default function UploadPage() {
                         <p className="upload-file-meta">{formatBytes(item.file.size)}{item.file.type ? ` · ${item.file.type}` : ' · 素材文件'}</p>
                         <div className="upload-file-progress" role="group" aria-label={`${item.file.name} 上传进度`}><Progress percent={item.progress} showText={false} strokeWidth={6} color={item.status === 'failed' || item.status === 'registration_failed' ? '#d88473' : '#25a98d'} /></div>
                         <div className="upload-file-progress-meta">
-                          <span>{item.error || (item.status === 'completed' ? '已保存到云空间' : item.status === 'registering' ? '正在校验云端文件并登记…' : item.status === 'paused' ? `${formatBytes(item.loaded)} / ${formatBytes(item.file.size)} · 已暂停` : item.status === 'uploading' ? `${formatBytes(item.loaded)} / ${formatBytes(item.file.size)}` : item.status === 'registration_failed' ? '文件已上传；仅需重试登记' : '等待开始')}</span>
+                          <span>{item.error || (item.status === 'completed' ? (isPhoto(item.file) || isVideo(item.file) ? item.location ? `已检测到 ${item.location.source === 'exif' ? 'EXIF' : 'SRT'} GPS · 位置以预览页为准` : '未定位 · 可在预览页手动标记' : '已保存到云空间') : item.status === 'registering' ? '正在校验云端文件并登记…' : item.status === 'paused' ? `${formatBytes(item.loaded)} / ${formatBytes(item.file.size)} · 已暂停` : item.status === 'uploading' ? `${formatBytes(item.loaded)} / ${formatBytes(item.file.size)}` : item.status === 'registration_failed' ? '文件已上传；仅需重试登记' : '等待开始')}</span>
                           <span>{item.status === 'uploading' && item.speed > 0 ? `${formatBytes(item.speed)}/s · ${formatClock(remaining)}` : ''}</span>
                         </div>
+                        {item.status === 'completed' && item.nodeId && (isPhoto(item.file) || isVideo(item.file)) && <Link className="upload-preview-link" to={`/preview/${item.nodeId}`} data-agent-id={`upload.queue.row.${item.id}.preview`}>查看位置 / 手动标记 →</Link>}
                         {(item.status === 'failed' || item.status === 'registration_failed') && (
                           <Button
                             className="upload-retry-button"
@@ -602,20 +600,14 @@ export default function UploadPage() {
               <div className="upload-tips-heading"><span aria-hidden="true">✦</span><div><small>A LITTLE TIP</small><b>让整理，从上传开始</b></div></div>
               <div className="upload-tip"><i>01</i><span><b>原片安心保存</b><small>浏览器直传私有 COS，应用服务器不接触文件内容。</small></span></div>
               <div className="upload-tip"><i>02</i><span><b>大文件分片传输</b><small>当前页面可暂停、继续与重试；刷新页面后队列不会自动恢复。</small></span></div>
-              <div className="upload-tip"><i>03</i><span><b>地点识别准备中</b><small>GPS / DJI SRT 解析与地图足迹还未接入。</small></span></div>
+              <div className="upload-tip"><i>03</i><span><b>自动识别拍摄位置</b><small>JPEG EXIF 与同一次选择中唯一同名的 DJI SRT 可自动定位；无坐标时不影响上传，可在预览页手动标记。地图足迹仍在建设中。</small></span></div>
               <p className="upload-tips-foot">只会上传你亲自选择或拖入的文件。</p>
             </aside>
           </div>
           <p className="upload-page-note">上传会话临时凭证约 30 分钟有效；单次浏览器会话内可暂停/继续，不保留刷新前的本地文件授权。</p>
         </section>
 
-        <nav className="upload-mobile-nav" aria-label="移动端导航" data-agent-region="upload.mobileNav">
-          <Link to="/" data-agent-id="nav.mobile.home"><span aria-hidden="true">⌂</span>首页</Link>
-          <Link to="/settings/account" data-agent-id="nav.mobile.account"><span aria-hidden="true">⌂</span>我的</Link>
-          <span className="is-active" aria-current="page"><span aria-hidden="true">↑</span>上传</span>
-          <Link to="/files" data-agent-id="nav.mobile.files"><span aria-hidden="true">▤</span>文件</Link>
-          <button type="button" disabled aria-disabled="true" data-agent-id="nav.mobile.map"><span aria-hidden="true">⌖</span>足迹</button>
-        </nav>
+        <WorkspaceMobileNavigation className="upload-mobile-nav" region="upload.mobileNav" />
       </main>
 
       {directoryOpen && (

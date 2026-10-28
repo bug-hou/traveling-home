@@ -23,7 +23,7 @@
 | `publicShare.gate.login` | 跳主站登录后手动返回分享地址 | 无 | 否 |
 | `publicShare.gate.password`、`.submit` | 输入并验证提取码（敏感值不读、不留存） | 提取码 | 否 |
 | `publicShare.error.retry` | 网络或分享异常时重试 | 无 | 否 |
-| `publicShare.gallery.root`、`.path.{nodeId}`、`.more` | 返回分享根、切换文件夹或分页 | 文件夹 ID | 否 |
+| `publicShare.gallery.back`、`.root`、`.path.{nodeId}`、`.more` | 嵌套文件夹返回上一级、回分享根目录、切换路径或分页 | 文件夹 ID | 否 |
 | `publicShare.gallery.listView`、`.gridView` | 切换网盘式列表和作品网格；活动模式默认网格，普通分享默认列表 | 视图 | 否 |
 | `publicShare.row.{nodeId}.open`、`.preview`、`.download` | 浏览目录、签发私有预览/下载链接 | 节点 ID | 否 |
 | `publicShare.preview.close` | 销毁当前媒体预览和临时签名地址 | 无 | 否 |
@@ -41,7 +41,7 @@
 
 ## 跳转
 
-- 来源为分享者生成的 `share.convenience.top/{公开用户名}/{自定义路径}`；仅允许浏览分享根目录的当前后代，移动到范围外立即不能继续请求新地址。
+- 来源为分享者生成的 `share.convenience.top/{公开用户名}/{自定义路径}`；深入目录时有“返回上一级”与分享根目录面包屑，预览弹层可关闭。仅允许浏览分享根目录的当前后代，移动到范围外立即不能继续请求新地址。
 - 被要求登录时前往主站登录页，再返回同一分享链接；旧的公开用户名仍指向原拥有者。
 
 ## 特殊说明

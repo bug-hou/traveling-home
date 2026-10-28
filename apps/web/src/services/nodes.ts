@@ -35,7 +35,7 @@ export interface NodeLocation {
   latitude: number;
   longitude: number;
   placeName: string | null;
-  source: 'manual';
+  source: 'exif' | 'srt' | 'manual';
 }
 
 const sortOptions: Record<NodeSort, { sortBy: string; sortOrder: string }> = {

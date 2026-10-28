@@ -16,7 +16,7 @@ const DECIMAL = '([+-]?(?:\\d+(?:\\.\\d+)?|\\.\\d+))';
 const LATITUDE = new RegExp(`\\[latitude:\\s*${DECIMAL}\\s*\\]`, 'i');
 const LONGITUDE = new RegExp(`\\[longitude:\\s*${DECIMAL}\\s*\\]`, 'i');
 const GPS = new RegExp(`\\bGPS\\s*\\(\\s*${DECIMAL}\\s*,\\s*${DECIMAL}(?:\\s*,[^)]*)?\\s*\\)`, 'i');
-const CUE = /^\s*\d+\s*\r?\n\s*\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}[^\r\n]*\r?\n/gm;
+const CUE = /^[ \t]*\d+[ \t]*\r?\n[ \t]*\d{2}:\d{2}:\d{2}[,.]\d{3}[ \t]*-->[ \t]*\d{2}:\d{2}:\d{2}[,.]\d{3}[^\r\n]*\r?\n/gm;
 
 function valid(latitude: number, longitude: number) {
   return Number.isFinite(latitude) && Number.isFinite(longitude)
@@ -40,7 +40,7 @@ export function matchingSidecar(video: SelectedMedia, items: readonly SelectedMe
   const sameName = items.filter((item) => item.batchId === video.batchId && stem(item.file.name) === stem(video.file.name));
   const videos = sameName.filter((item) => isVideo(item.file));
   const sidecars = sameName.filter((item) => /\.srt$/i.test(item.file.name));
-  return videos.length === 1 && videos[0] === video && sidecars.length === 1 ? sidecars[0].file : null;
+  return videos.length === 1 && videos[0].file === video.file && sidecars.length === 1 ? sidecars[0].file : null;
 }
 
 function coordinatesFromCue(cue: string): { latitude: number; longitude: number } | null {
@@ -79,7 +79,7 @@ export async function parseAutomaticLocation(media: SelectedMedia, items: readon
       if (point) return { ...point, source: 'srt' };
     }
   } catch {
-    // Metadata parsing must never block the original file upload.
+    return null;
   }
   return null;
 }

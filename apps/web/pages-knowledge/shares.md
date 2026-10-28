@@ -9,7 +9,7 @@
 
 | region | 内容 |
 |---|---|
-| `shares.sidebar`、`shares.header`、`shares.mobileNav` | 桌面工作区侧栏/顶栏、手机固定底栏及文件/账号导航 |
+| `shares.sidebar`、`shares.header`、`shares.mobileNav` | 共用桌面工作区菜单与手机五项底栏；列表/创建/编辑都高亮“我的分享”，顶栏显示当前层级 |
 | `shares.overview` | 全部、生效中、累计访问概览 |
 | `shares.list`、`shares.filters`、`shares.row.{shareId}` | 分享状态分栏、名称/路径搜索、表格式列表；手机显示卡片操作 |
 | `shares.handle` | 尚未设置公开用户名时的入口 |
@@ -20,9 +20,9 @@
 
 | data-agent-id / 工具名 | 作用 | 参数 | 危险 |
 |---|---|---|---|
-| `shares.header.brand`、`.files`、`.back` | 返回首页、文件空间或分享列表 | 无 | 否 |
-| `shares.sidebar.home`、`.files`、`.upload`、`.shares`、`.pickFiles`、`.profile` | 桌面工作区导航、选择分享对象及账号入口 | 无 | 否 |
-| `shares.mobile.home`、`.files`、`.shares`、`.account` | 手机底部导航 | 无 | 否 |
+| `nav.home.brand`、`shares.header.files`、`shares.header.back` | 返回首页/文件空间；创建详情返回发起目录，编辑详情返回分享列表 | 无 | 否 |
+| `nav.*`、`nav.mobile.*`、`shares.sidebar.pickFiles` | 共用桌面/手机主菜单，选择要分享的文件；当前项为“我的分享” | 无 | 否 |
+| `shares.editor.pickFiles` | 创建页缺少分享目标时前往文件空间选择文件 | 无 | 否 |
 | `shares.header.account`、`shares.handle.setup`、`shares.editor.setupHandle` | 前往公开用户名设置 | 无 | 否 |
 | `shares.list.create`、`shares.empty.files` | 前往文件页选择分享对象 | 无 | 否 |
 | `shares.filters.all`、`.active`、`.expired`、`.revoked`、`.search` | 按状态及标题/路径筛选已加载分享 | 状态、关键词 | 否 |
@@ -50,7 +50,7 @@
 
 ## 跳转
 
-- 从文件菜单“分享文件/文件夹”进入创建页；从账号页进入列表；公开链接指向分享域名。
+- 从文件菜单“分享文件/文件夹”进入创建页，返回/取消时优先回原目录或搜索结果；缺失 `targetId` 时提示先去文件空间选择，直接打开创建页则回分享列表。编辑详情固定回分享列表，保存后也回列表。账号页可进入列表；公开链接指向分享域名。
 - 编辑的自定义路径变更后旧路径失效；修改公开用户名后保留旧用户名映射。
 
 ## 特殊说明
