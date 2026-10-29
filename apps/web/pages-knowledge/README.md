@@ -75,6 +75,8 @@ Arco 复杂组件（Select、DatePicker、Dropdown、Tabs、Upload 等）的 `da
 | 上传页 `Progress` | 内部自带 `role="progressbar"` 与当前百分比；外部包装使用有名称的 `role="group"`，避免重复进度条语义。 |
 | 认证与账号页 `Input` / `Input.Password` / `Button` | 实测 `data-agent-id` 与密码输入的 `data-agent-ignore` 落在原生 `input`；提交的 `data-agent-id` 落在原生 `button[type="submit"]`。密码显隐按钮继续使用独立埋点。 |
 | 文件页 `Input.Search` / `Input` | 实测搜索框 `data-agent-id="files.toolbar.search"` 落在 `input[type="search"]`（`searchbox`，可用 ⌘/Ctrl+K 聚焦）；新建/重命名的 `data-agent-id="files.dialog.name"` 落在 Modal 内自动聚焦的原生 `input`。搜索聚焦只显示外层容器品牌焦点线，不叠加输入内层边框。 |
+| 分享页 `Input.Search` / `Input.TextArea` / `InputNumber` / `Checkbox` | 390px 隔离浏览器实测：搜索埋点落在 `input[type="search"]`，介绍落在原生 `textarea`，次数埋点落在 `input[role="spinbutton"]`，勾选埋点落在可点击的 Arco `label`（内部含原生 checkbox）；数字框增量操作能更新表单预览，内层边框已去重，页面无横向溢出。 |
+| 公开分享页 `Input.Password` | 390px 隔离浏览器实测提取码埋点和 `data-agent-ignore` 均落在原生 `input[type="password"]`；控件使用 Arco 外观并保持 44px 高。 |
 
 ## 与业务代码的约定（摘要，完整规则见 `.codebuddy/rules/web-agent-ready.mdc`）
 

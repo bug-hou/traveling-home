@@ -44,11 +44,13 @@ export interface PublicBrowse {
   offset: number;
 }
 
-export type ShareFilter = 'all' | 'active' | 'expired' | 'revoked';
+export type ShareFilter = 'all' | 'active' | 'exhausted' | 'expired' | 'revoked';
 
 export function shareStatus(share: Share, now = Date.now()): Exclude<ShareFilter, 'all'> {
   if (share.revokedAt) return 'revoked';
-  return share.expiresAt && Date.parse(share.expiresAt) <= now ? 'expired' : 'active';
+  if (share.expiresAt && Date.parse(share.expiresAt) <= now) return 'expired';
+  if (share.targetType === 'note' && share.maxViews != null && share.viewCount >= share.maxViews) return 'exhausted';
+  return 'active';
 }
 
 export function filterShares(items: Share[], filter: ShareFilter, query: string, now = Date.now()) {

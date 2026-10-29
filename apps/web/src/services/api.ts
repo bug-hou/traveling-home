@@ -19,7 +19,9 @@ export class ApiError extends Error {
   readonly details: ApiErrorDetail[];
 
   constructor(status: number, payload?: ErrorPayload) {
-    super(payload?.error?.message ?? '请求失败，请稍后重试');
+    super(status === 404 && payload?.error?.code === 'NOT_FOUND'
+      ? '当前服务未提供此接口，请核对请求路径和 API 是否已发布。'
+      : payload?.error?.message ?? '请求失败，请稍后重试');
     this.name = 'ApiError';
     this.code = payload?.error?.code ?? 'REQUEST_FAILED';
     this.status = status;
