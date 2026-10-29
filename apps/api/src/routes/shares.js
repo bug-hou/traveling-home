@@ -21,7 +21,13 @@ const settings = z.object({
   allowDownload: z.boolean().optional(),
   maxDownloads: z.number().int().min(1).max(1_000_000).nullable().optional(),
 }).strict();
-const createBody = settings.extend({ targetId: id });
+const createBody = settings.extend({ targetId: id.optional(), noteId: id.optional() })
+  .refine((body) => Boolean(body.targetId) !== Boolean(body.noteId), '请选择一个分享目标');
+const noteBody = z.object({ title: z.string().trim().min(1).max(80), content: z.string().min(1).max(10_000) }).strict();
+const noteChanges = noteBody.partial().refine((body) => Object.keys(body).length > 0, '请提供要修改的内容');
+const noteId = z.object({ id });
+const noteList = z.object({ offset: z.coerce.number().int().min(0).max(100_000).default(0) }).strict();
+const publicNoteBody = z.object({ password: z.string().max(128).optional() }).strict();
 const browseBody = z.object({ password: z.string().max(128).optional(), parentId: id.optional(), offset: z.number().int().min(0).max(100_000).default(0) }).strict();
 const accessBody = z.object({ password: z.string().max(128).optional(), purpose: z.enum(['preview', 'download']) }).strict();
 const INLINE = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'audio/mpeg', 'audio/mp4', 'audio/ogg', 'audio/wav']);
@@ -29,6 +35,10 @@ const COVER_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'
 
 function publicNode(node) {
   return { id: String(node._id), parentId: node.parentId ? String(node.parentId) : null, type: node.type, name: node.name, size: node.size ?? 0, mime: node.mime ?? null };
+}
+
+function privateNote(note, includeContent = true) {
+  return { id: String(note._id), title: note.title, ...(includeContent ? { content: note.content } : {}), createdAt: note.createdAt, updatedAt: note.updatedAt };
 }
 
 function ownerShare(share) {
@@ -65,6 +75,7 @@ async function insideShare(nodes, share, nodeId) {
 
 export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
   const shares = db.collection('shares');
+  const notes = db.collection('notes');
   const nodes = db.collection('nodes');
   const users = db.collection('users');
   const handles = db.collection('handles');
@@ -102,24 +113,82 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     return Boolean(cover?.type === 'file' && cover.status === 'ready' && cover.size > 0 && cover.size <= 2 * 1024 * 1024 && COVER_MIME.has(cover.mime?.toLowerCase()) && await insideShare(nodes, share, coverNodeId));
   }
 
+  app.post('/notes', { preHandler: [requireAuth, noStore], config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const body = parseBody(noteBody, req.body, reply);
+    if (!body) return;
+    const now = new Date();
+    const note = { userId: req.user._id, ...body, deletedAt: null, createdAt: now, updatedAt: now };
+    await notes.insertOne(note);
+    return reply.code(201).send({ note: privateNote(note) });
+  });
+
+  app.get('/notes', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
+    const query = noteList.safeParse(req.query);
+    if (!query.success) return fail(reply, 400, 'INVALID_INPUT', '分页参数不正确');
+    const filter = { userId: req.user._id, deletedAt: null };
+    const [total, items] = await Promise.all([
+      notes.countDocuments(filter),
+      notes.find(filter, { projection: { content: 0 } }).sort({ updatedAt: -1, _id: -1 }).skip(query.data.offset).limit(50).toArray(),
+    ]);
+    return { items: items.map((note) => privateNote(note, false)), total, offset: query.data.offset };
+  });
+
+  app.get('/notes/:id', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
+    if (!noteId.safeParse(req.params).success) return fail(reply, 404, 'NOTE_NOT_FOUND', '笔记不存在');
+    const note = await notes.findOne({ _id: new ObjectId(req.params.id), userId: req.user._id, deletedAt: null });
+    if (!note) return fail(reply, 404, 'NOTE_NOT_FOUND', '笔记不存在');
+    return { note: privateNote(note) };
+  });
+
+  app.patch('/notes/:id', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
+    if (!noteId.safeParse(req.params).success) return fail(reply, 404, 'NOTE_NOT_FOUND', '笔记不存在');
+    const body = parseBody(noteChanges, req.body, reply);
+    if (!body) return;
+    const updated = await notes.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id), userId: req.user._id, deletedAt: null },
+      { $set: { ...body, updatedAt: new Date() } }, { returnDocument: 'after' },
+    );
+    if (!updated) return fail(reply, 404, 'NOTE_NOT_FOUND', '笔记不存在');
+    return { note: privateNote(updated) };
+  });
+
+  app.delete('/notes/:id', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
+    if (!noteId.safeParse(req.params).success) return fail(reply, 404, 'NOTE_NOT_FOUND', '笔记不存在');
+    const result = await notes.updateOne(
+      { _id: new ObjectId(req.params.id), userId: req.user._id, deletedAt: null },
+      { $set: { deletedAt: new Date() } },
+    );
+    if (!result.matchedCount) return fail(reply, 404, 'NOTE_NOT_FOUND', '笔记不存在');
+    return reply.code(204).send();
+  });
+
   app.post('/shares', { preHandler: [requireAuth, noStore] }, async (req, reply) => {
     const body = parseBody(createBody, req.body, reply);
     if (!body) return;
     if (!req.user.publicHandle) return fail(reply, 409, 'HANDLE_REQUIRED', '请先在账号设置中设置公开用户名');
-    const targetId = new ObjectId(body.targetId);
-    const node = await activeNode(nodes, req.user._id, targetId);
-    if (!node || (node.type === 'file' && node.status !== 'ready')) return fail(reply, 404, 'NODE_NOT_FOUND', '文件或文件夹不存在');
+    const isNote = Boolean(body.noteId);
+    if (isNote && (body.mode === 'activity' || body.coverNodeId != null || body.allowPreview === false || body.allowDownload === true || body.maxDownloads != null || body.requireLogin === true)) {
+      return fail(reply, 400, 'INVALID_NOTE_SHARE', '笔记分享不支持活动、封面、下载或跨站登录，请使用提取码');
+    }
+    const targetId = new ObjectId(body.noteId ?? body.targetId);
+    const target = isNote
+      ? await notes.findOne({ _id: targetId, userId: req.user._id, deletedAt: null })
+      : await activeNode(nodes, req.user._id, targetId);
+    if (!target || (!isNote && target.type === 'file' && target.status !== 'ready')) {
+      return fail(reply, 404, isNote ? 'NOTE_NOT_FOUND' : 'NODE_NOT_FOUND', isNote ? '笔记不存在' : '文件或文件夹不存在');
+    }
     const changes = await settingsUpdate(body, null, reply);
     if (!changes) return;
     const now = new Date();
     const share = {
-      userId: req.user._id, targetId, targetType: node.type,
+      userId: req.user._id, targetId, targetType: isNote ? 'note' : target.type,
+      ...(isNote ? { noteSnapshot: { title: target.title, content: target.content } } : {}),
       slug: changes.slug ?? `journey-${randomBytes(6).toString('hex')}`,
-      title: changes.title ?? node.name, description: changes.description ?? '', mode: changes.mode ?? 'standard',
+      title: changes.title ?? (isNote ? target.title : target.name), description: changes.description ?? '', mode: changes.mode ?? 'standard',
       coverNodeId: changes.coverNodeId ?? null, passwordHash: changes.passwordHash ?? null,
       requireLogin: changes.requireLogin ?? false, expiresAt: changes.expiresAt ?? null,
-      allowPreview: changes.allowPreview ?? true, allowDownload: changes.allowDownload ?? true,
-      maxDownloads: changes.maxDownloads ?? null, downloadCount: 0, viewCount: 0,
+      allowPreview: changes.allowPreview ?? true, allowDownload: isNote ? false : changes.allowDownload ?? true,
+      maxDownloads: isNote ? null : changes.maxDownloads ?? null, downloadCount: 0, viewCount: 0,
       revokedAt: null, createdAt: now, updatedAt: now,
     };
     if (!share.allowPreview && !share.allowDownload) return fail(reply, 400, 'NO_ACCESS', '预览和下载至少开启一项');
@@ -143,6 +212,9 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     const _id = new ObjectId(req.params.id);
     const current = await shares.findOne({ _id, userId: req.user._id, revokedAt: null });
     if (!current) return fail(reply, 404, 'SHARE_NOT_FOUND', '分享不存在');
+    if (current.targetType === 'note' && (body.mode === 'activity' || body.coverNodeId != null || body.allowPreview === false || body.allowDownload === true || body.maxDownloads != null || body.requireLogin === true)) {
+      return fail(reply, 400, 'INVALID_NOTE_SHARE', '笔记分享不支持活动、封面、下载或跨站登录，请使用提取码');
+    }
     const changes = await settingsUpdate(body, current, reply);
     if (!changes) return;
     if (changes.allowPreview === false && !('allowDownload' in changes) && !current.allowDownload || changes.allowDownload === false && !('allowPreview' in changes) && !current.allowPreview) {
@@ -176,7 +248,11 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     const ownerHandle = await handles.findOne({ _id: path.data.handle });
     if (!ownerHandle) return deny(404, 'SHARE_NOT_FOUND', '分享不存在');
     const share = await shares.findOne({ userId: ownerHandle.userId, slug: path.data.slug, revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] });
-    if (!share || !await activeNode(nodes, share.userId, share.targetId)) return deny(404, 'SHARE_NOT_FOUND', '分享不存在或已失效');
+    if (!share || !(share.targetType === 'note'
+      ? await notes.findOne({ _id: share.targetId, userId: share.userId, deletedAt: null })
+      : await activeNode(nodes, share.userId, share.targetId))) {
+      return deny(404, 'SHARE_NOT_FOUND', '分享不存在或已失效');
+    }
     const owner = await users.findOne({ _id: share.userId, status: 'active' });
     if (!owner) return deny(404, 'SHARE_NOT_FOUND', '分享不存在或已失效');
     if (share.requireLogin) {
@@ -189,12 +265,41 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     return { share, owner };
   }
 
+  app.post('/public/shares/:handle/:slug/note', { preHandler: noStore, config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const body = parseBody(publicNoteBody, req.body, reply);
+    if (!body) return;
+    const resolved = await resolve(req, reply, body.password);
+    if (!resolved) return;
+    const { share, owner } = resolved;
+    if (share.targetType !== 'note' || !share.allowPreview) return fail(reply, 404, 'SHARE_NOT_FOUND', '笔记分享不存在');
+    const now = new Date();
+    const active = await shares.updateOne(
+      { _id: share._id, targetType: 'note', allowPreview: true, revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
+      { $inc: { viewCount: 1 } },
+    );
+    if (!active.matchedCount || !await notes.findOne({ _id: share.targetId, userId: share.userId, deletedAt: null })) {
+      return fail(reply, 404, 'SHARE_NOT_FOUND', '笔记分享已失效');
+    }
+    return {
+      share: { targetType: 'note', title: share.title, description: share.description, expiresAt: share.expiresAt,
+        ownerName: owner.nickname, handle: owner.publicHandle, requireLogin: share.requireLogin, hasPassword: Boolean(share.passwordHash) },
+      note: share.noteSnapshot,
+    };
+  });
+
   app.post('/public/shares/:handle/:slug/browse', { preHandler: noStore, config: { rateLimit: { max: 12, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = parseBody(browseBody, req.body, reply);
     if (!body) return;
     const resolved = await resolve(req, reply, body.password);
     if (!resolved) return;
     const { share, owner } = resolved;
+    if (share.targetType === 'note') {
+      if (body.parentId) return fail(reply, 404, 'NODE_NOT_FOUND', '笔记分享不包含文件夹');
+      return { share: { targetType: 'note', title: share.title, description: share.description, mode: 'standard',
+        coverNodeId: null, requireLogin: share.requireLogin, hasPassword: Boolean(share.passwordHash), expiresAt: share.expiresAt,
+        allowPreview: true, allowDownload: false, maxDownloads: null, downloadCount: 0,
+        ownerName: owner.nickname, handle: owner.publicHandle }, root: null, breadcrumbs: [], items: [], total: 0, offset: body.offset };
+    }
     const root = await activeNode(nodes, share.userId, share.targetId);
     const parent = body.parentId ? await activeNode(nodes, share.userId, new ObjectId(body.parentId)) : root;
     if (!root || !parent || !await insideShare(nodes, share, parent._id) || (parent.type !== 'folder' && String(parent._id) !== String(root._id))) {
@@ -215,7 +320,7 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     const items = parent.type === 'folder' ? await nodes.find(filter).sort({ name: 1, _id: 1 }).skip(body.offset).limit(50).toArray() : [];
     if (!body.parentId && body.offset === 0) await shares.updateOne({ _id: share._id }, { $inc: { viewCount: 1 } });
     return {
-      share: { title: share.title, description: share.description, mode: share.mode, coverNodeId: share.coverNodeId ? String(share.coverNodeId) : null,
+      share: { targetType: share.targetType, title: share.title, description: share.description, mode: share.mode, coverNodeId: share.coverNodeId ? String(share.coverNodeId) : null,
         requireLogin: share.requireLogin, hasPassword: Boolean(share.passwordHash), expiresAt: share.expiresAt,
         allowPreview: share.allowPreview, allowDownload: share.allowDownload, maxDownloads: share.maxDownloads, downloadCount: share.downloadCount,
         ownerName: owner.nickname, handle: owner.publicHandle },
@@ -230,6 +335,7 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     const resolved = await resolve(req, reply, body.password);
     if (!resolved) return;
     const { share } = resolved;
+    if (share.targetType === 'note') return fail(reply, 404, 'SHARE_NOT_FOUND', '此分享不包含文件');
     if (body.purpose === 'download' && !share.allowDownload || body.purpose === 'preview' && !share.allowPreview) {
       return fail(reply, 403, 'ACCESS_DISABLED', '分享未开放此操作');
     }

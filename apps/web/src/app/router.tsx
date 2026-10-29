@@ -13,6 +13,8 @@ const PreviewPage = lazy(() => import('@/pages/PreviewPage'));
 const SharesPage = lazy(() => import('@/pages/SharesPage'));
 const PublicSharePage = lazy(() => import('@/pages/PublicSharePage'));
 const PhoneUploadPage = lazy(() => import('@/pages/PhoneUploadPage'));
+const NotesPage = lazy(() => import('@/pages/NotesPage'));
+const PhoneNotePage = lazy(() => import('@/pages/PhoneNotePage'));
 
 function GuestOnly() {
   const { user, loading } = useAuth();
@@ -34,6 +36,7 @@ export const router = createBrowserRouter([
         ],
       },
       { path: 'phone-upload/:id', element: <Suspense fallback={<main className="auth-loading">正在连接手机…</main>}><PhoneUploadPage /></Suspense>, handle: { agent: { pageId: 'phoneUpload' } } },
+      { path: 'phone-note/:id', element: <Suspense fallback={<main className="auth-loading">正在连接手机…</main>}><PhoneNotePage /></Suspense>, handle: { agent: { pageId: 'phoneNote' } } },
       { path: 's/:handle/:slug', element: <Suspense fallback={<main className="auth-loading">正在打开分享…</main>}><PublicSharePage /></Suspense>, handle: { agent: { pageId: 'publicShare' } } },
       { path: ':handle/:slug', element: <Suspense fallback={<main className="auth-loading">正在打开分享…</main>}><PublicSharePage /></Suspense>, handle: { agent: { pageId: 'publicShare' } } },
       {
@@ -45,6 +48,7 @@ export const router = createBrowserRouter([
           { path: 'upload', element: <Suspense fallback={<main className="auth-loading">正在打开上传空间…</main>}><UploadPage /></Suspense>, handle: { agent: { pageId: 'upload' }, navigation: 'upload' } },
           { path: 'files/:folderId?', element: <Suspense fallback={<main className="auth-loading">正在打开文件空间…</main>}><FilesPage /></Suspense>, handle: { agent: { pageId: 'files' }, navigation: 'files' } },
           { path: 'map', element: <Suspense fallback={<main className="auth-loading">正在打开足迹地图…</main>}><MapPage /></Suspense>, handle: { agent: { pageId: 'map' }, navigation: 'map' } },
+          { path: 'notes', element: <Suspense fallback={<main className="auth-loading">正在打开随手记…</main>}><NotesPage /></Suspense>, handle: { agent: { pageId: 'notes' }, navigation: 'notes' } },
           { path: 'preview/:nodeId', element: <Suspense fallback={<main className="auth-loading">正在打开素材…</main>}><PreviewPage /></Suspense>, handle: { agent: { pageId: 'preview' }, navigation: 'files' } },
           { path: 'shares', element: <Suspense fallback={<main className="auth-loading">正在打开我的分享…</main>}><SharesPage /></Suspense>, handle: { agent: { pageId: 'shares' }, navigation: 'shares' } },
           { path: 'shares/new', element: <Suspense fallback={<main className="auth-loading">正在打开分享配置…</main>}><SharesPage /></Suspense>, handle: { agent: { pageId: 'shares' }, navigation: 'shares' } },

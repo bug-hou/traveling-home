@@ -26,6 +26,7 @@ function fixture() {
     users: [{ _id: userId, publicHandle: 'traveler', nickname: '旅人', status: 'active' }, { _id: otherId, publicHandle: 'other', nickname: '访客', status: 'active' }],
     handles: [{ _id: 'traveler', userId }],
     shares: [],
+    notes: [],
     nodes: [
       { _id: rootId, userId, type: 'folder', name: '相册', parentId: null, deletedAt: null },
       { _id: imageId, userId, type: 'file', name: 'photo.jpg', mime: 'image/jpeg', size: 100, status: 'ready', cosKey: `movehome/users/${userId}/originals/p.jpg`, parentId: rootId, deletedAt: null },
@@ -34,7 +35,7 @@ function fixture() {
   };
   const collection = (name) => ({
     findOne: async (query) => docs[name].find((doc) => matches(doc, query)) ?? null,
-    insertOne: async (doc) => { if (docs[name].some((item) => item.userId && same(item.userId, doc.userId) && item.slug === doc.slug)) { const err = new Error('duplicate'); err.code = 11000; throw err; } doc._id ??= new ObjectId(); docs[name].push(doc); return { insertedId: doc._id }; },
+    insertOne: async (doc) => { if (name === 'shares' && docs[name].some((item) => same(item.userId, doc.userId) && item.slug === doc.slug)) { const err = new Error('duplicate'); err.code = 11000; throw err; } doc._id ??= new ObjectId(); docs[name].push(doc); return { insertedId: doc._id }; },
     updateOne: async (query, update) => { const item = docs[name].find((doc) => matches(doc, query)); if (!item) return { matchedCount: 0 }; Object.assign(item, update.$set); for (const [key, value] of Object.entries(update.$inc ?? {})) item[key] += value; return { matchedCount: 1 }; },
     findOneAndUpdate: async (query, update) => { const item = docs[name].find((doc) => matches(doc, query)); if (item) Object.assign(item, update.$set); return item ?? null; },
     countDocuments: async (query) => docs[name].filter((doc) => matches(doc, query)).length,
@@ -150,4 +151,86 @@ test('unshareable unsafe preview, time limit and ownership on edits', async (t) 
   assert.equal((await ctx.access(ctx.imageId, 'preview')).statusCode, 422);
   ctx.docs.shares[0].expiresAt = new Date(Date.now() - 1000);
   assert.equal((await ctx.browse()).statusCode, 404);
+});
+
+test('私有笔记限制大小、仅本人访问且列表不泄露正文', async (t) => {
+  const ctx = fixture(); await ctx.ready(); t.after(() => ctx.app.close());
+  const owner = { 'x-test-user': String(ctx.userId) };
+  const foreign = { 'x-test-user': String(ctx.otherId) };
+  const send = (method, path, payload, headers = owner) => ctx.app.inject({ method, url: `/notes${path}`, payload, headers });
+  assert.equal((await send('POST', '', { title: '旅途', content: '小秘密' }, {})).statusCode, 401);
+  assert.equal((await send('POST', '', { title: ' ', content: 'x' })).statusCode, 400);
+  assert.equal((await send('POST', '', { title: 'x', content: 'a'.repeat(10_001) })).statusCode, 400);
+  const created = await send('POST', '', { title: '旅途', content: '<script>alert(1)</script>' });
+  assert.equal(created.statusCode, 201, created.body);
+  const noteId = created.json().note.id;
+  assert.match(created.headers['cache-control'], /no-store/);
+  const list = await send('GET', '?offset=0');
+  assert.equal(list.json().total, 1);
+  assert.ok(!list.body.includes('<script>'));
+  assert.deepEqual(Object.keys(list.json().items[0]).sort(), ['createdAt', 'id', 'title', 'updatedAt']);
+  assert.equal((await send('GET', `/${noteId}`, undefined, foreign)).statusCode, 404);
+  assert.equal((await send('PATCH', `/${noteId}`, { title: '窃取' }, foreign)).statusCode, 404);
+  assert.equal((await send('DELETE', `/${noteId}`, undefined, foreign)).statusCode, 404);
+  assert.equal((await send('PATCH', `/${noteId}`, { content: '新内容' })).json().note.content, '新内容');
+  assert.equal((await send('PATCH', `/${noteId}`, { content: '' })).statusCode, 400);
+  assert.equal((await send('DELETE', `/${noteId}`)).statusCode, 204);
+  assert.equal((await send('GET', `/${noteId}`)).statusCode, 404);
+});
+
+test('笔记分享冻结创建时正文、使用原分享提取码/期限/撤销规则且与文件互斥', async (t) => {
+  const ctx = fixture(); await ctx.ready(); t.after(() => ctx.app.close());
+  const owner = { 'x-test-user': String(ctx.userId) };
+  const note = (await ctx.app.inject({ method: 'POST', url: '/notes', headers: owner, payload: { title: '草稿', content: '第一版' } })).json().note;
+  const create = (payload) => ctx.app.inject({ method: 'POST', url: '/shares', headers: owner, payload });
+  const read = (payload = {}, path = 'traveler/private-note') => ctx.app.inject({ method: 'POST', url: `/public/shares/${path}/note`, payload });
+  assert.equal((await create({ noteId: note.id, targetId: String(ctx.imageId) })).statusCode, 400);
+  assert.equal((await create({ noteId: note.id, mode: 'activity' })).statusCode, 400);
+  assert.equal((await create({ noteId: note.id, allowDownload: true })).statusCode, 400);
+  assert.equal((await create({ noteId: note.id, requireLogin: true })).json().error.code, 'INVALID_NOTE_SHARE');
+  const shared = await create({ noteId: note.id, slug: 'private-note', password: 'passcode', expiresAt: new Date(Date.now() + 600000).toISOString() });
+  assert.equal(shared.statusCode, 201, shared.body);
+  assert.equal(shared.json().share.targetType, 'note');
+  assert.equal(shared.json().share.allowDownload, false);
+  assert.ok(!shared.body.includes('第一版'));
+  assert.equal((await read()).statusCode, 403);
+  assert.equal((await read({ password: 'bad' })).statusCode, 403);
+  assert.equal((await read({ password: 'passcode' })).json().note.content, '第一版');
+  assert.ok(!JSON.stringify(ctx.docs.shares[0]).includes('passcode'));
+  assert.equal(ctx.docs.shares[0].viewCount, 1);
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/notes/${note.id}`, headers: owner, payload: { title: '新标题', content: '第二版' } })).statusCode, 200);
+  assert.deepEqual((await read({ password: 'passcode' })).json().note, { title: '草稿', content: '第一版' });
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/shares/${shared.json().share.id}`, headers: owner, payload: { allowDownload: true } })).statusCode, 400);
+  const metadata = await ctx.app.inject({ method: 'POST', url: '/public/shares/traveler/private-note/browse', payload: { password: 'passcode' } });
+  assert.equal(metadata.statusCode, 200, metadata.body);
+  assert.equal(metadata.json().share.targetType, 'note');
+  assert.equal(metadata.json().root, null);
+  assert.ok(!metadata.body.includes('第一版'));
+  assert.ok(!metadata.body.includes('第二版'));
+  assert.equal((await ctx.app.inject({ method: 'POST', url: '/public/shares/traveler/private-note/browse', payload: { password: 'passcode', parentId: String(ctx.rootId) } })).statusCode, 404);
+  assert.equal((await ctx.app.inject({ method: 'POST', url: `/public/shares/traveler/private-note/files/${ctx.imageId}/access`, payload: { password: 'passcode', purpose: 'preview' } })).statusCode, 404);
+  assert.equal(ctx.calls.length, 0);
+  ctx.docs.shares[0].expiresAt = new Date(Date.now() - 1);
+  assert.equal((await read({ password: 'passcode' })).statusCode, 404);
+  ctx.docs.shares[0].expiresAt = null;
+  assert.equal((await ctx.app.inject({ method: 'DELETE', url: `/shares/${shared.json().share.id}`, headers: owner })).statusCode, 204);
+  assert.equal((await read({ password: 'passcode' })).statusCode, 404);
+  assert.equal((await create({ noteId: note.id, slug: 'private-note2', password: 'passcode' })).statusCode, 201);
+  assert.equal((await ctx.app.inject({ method: 'DELETE', url: `/notes/${note.id}`, headers: owner })).statusCode, 204);
+  assert.equal((await read({ password: 'passcode' }, 'traveler/private-note2')).statusCode, 404);
+  assert.equal((await ctx.create()).statusCode, 201);
+  assert.equal((await ctx.browse()).statusCode, 200);
+});
+
+test('笔记分享编辑禁止跨站登录，旧文件分享仍支持原有登录设置', async (t) => {
+  const ctx = fixture(); await ctx.ready(); t.after(() => ctx.app.close());
+  const owner = { 'x-test-user': String(ctx.userId) };
+  const note = (await ctx.app.inject({ method: 'POST', url: '/notes', headers: owner, payload: { title: '限定', content: 'only owner' } })).json().note;
+  const shared = await ctx.app.inject({ method: 'POST', url: '/shares', headers: owner, payload: { noteId: note.id, slug: 'login-note' } });
+  assert.equal(shared.statusCode, 201);
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/shares/${shared.json().share.id}`, headers: owner, payload: { requireLogin: true } })).json().error.code, 'INVALID_NOTE_SHARE');
+  assert.equal((await ctx.app.inject({ method: 'POST', url: '/public/shares/traveler/login-note/note' })).json().note.content, 'only owner');
+  assert.equal((await ctx.create({ requireLogin: true })).statusCode, 201);
+  assert.equal((await ctx.browse()).statusCode, 401);
+  assert.equal((await ctx.app.inject({ method: 'POST', url: '/public/shares/traveler/west-trip/note', headers: owner })).statusCode, 404);
 });

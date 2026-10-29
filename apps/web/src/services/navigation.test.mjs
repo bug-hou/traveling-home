@@ -3,17 +3,18 @@ import test from 'node:test';
 import { currentPagePath, navigationSource, returnLabel, returnTarget, workspaceSections } from './navigation.ts';
 
 test('工作区导航有固定且唯一的可用层级', () => {
-  assert.deepEqual(workspaceSections.map(({ id }) => id), ['home', 'files', 'map', 'upload', 'shares', 'account']);
+  assert.deepEqual(workspaceSections.map(({ id }) => id), ['home', 'files', 'map', 'upload', 'notes', 'shares', 'account']);
   assert.equal(new Set(workspaceSections.map(({ to }) => to)).size, workspaceSections.length);
 });
 
 test('详情返回保留站内来源路径及查询参数', () => {
-  for (const path of ['/', '/files', '/files/0123456789abcdef01234567?q=海边', '/upload?parentId=0123456789abcdef01234567', '/map', '/shares', '/shares/new?targetId=0123456789abcdef01234567', '/shares/0123456789abcdef01234567/edit', '/settings/account', '/preview/0123456789abcdef01234567']) {
+  for (const path of ['/', '/files', '/files/0123456789abcdef01234567?q=海边', '/upload?parentId=0123456789abcdef01234567', '/map', '/notes', '/shares', '/shares/new?targetId=0123456789abcdef01234567', '/shares/0123456789abcdef01234567/edit', '/settings/account', '/preview/0123456789abcdef01234567']) {
     assert.equal(returnTarget(path, '/files'), path);
   }
   assert.equal(currentPagePath('/files', '?q=%E6%B5%B7'), '/files?q=%E6%B5%B7');
   assert.equal(returnLabel('/files?q=海边'), '文件搜索结果');
   assert.equal(returnLabel('/map'), '足迹地图');
+  assert.equal(returnLabel('/notes'), '随手记');
 });
 
 test('多层详情来源安全传播，拒绝自指及站外来源', () => {

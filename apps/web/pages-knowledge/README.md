@@ -22,9 +22,11 @@
 | `phoneUpload` | `/phone-upload/:id` | 手机免登录扫码、等待电脑批准及 COS 直传 | `phoneUpload.md` |
 | `files` | `/files/:folderId?` | 文件浏览与管理，打开文件进入详情 | `files.md` |
 | `map` | `/map` | 本人已定位素材点位与未定位列表 | `map.md` |
+| `notes` | `/notes` | 私有纯文本笔记列表、编辑、手机扫码授权及公开分享入口 | `notes.md` |
+| `phoneNote` | `/phone-note/:id` | 手机免登录核码后短时只读单条笔记 | `phoneNote.md` |
 | `preview` | `/preview/:nodeId` | 私有素材预览、自动位置来源与手动标记 | `preview.md` |
-| `shares` | `/shares`、`/shares/new?targetId=...`、`/shares/:id/edit` | 网盘式分享管理、状态筛选及配置 | `shares.md` |
-| `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 公开目录浏览与活动作品展示 | `publicShare.md` |
+| `shares` | `/shares`、`/shares/new?targetId=...&targetType=note`、`/shares/:id/edit` | 文件/笔记分享管理、公开二维码及配置 | `shares.md` |
+| `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 文件目录、活动作品与公开笔记只读阅读 | `publicShare.md` |
 
 表中为应用内部路由；Lighthouse 部署在 `https://api.convenience.top/app/`，实际访问需在路由前添加 `/app`。本地开发仍使用根路径，不改变 pageId 和 Agent 埋点。现有正式页面已对齐 `design/` 的白底细框简约风格；视觉调整不改变 Agent 埋点、权限边界或业务状态。
 

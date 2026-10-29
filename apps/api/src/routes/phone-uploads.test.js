@@ -17,7 +17,7 @@ function matches(doc, filter) {
   });
 }
 function fakeDb() {
-  const collections = Object.fromEntries(['nodes', 'upload_sessions', 'phone_upload_pairs'].map((name) => {
+  const collections = Object.fromEntries(['nodes', 'upload_sessions', 'phone_upload_pairs', 'notes', 'note_read_pairs'].map((name) => {
     const documents = [];
     return [name, {
       documents,
@@ -30,6 +30,7 @@ function fakeDb() {
         const doc = documents.find((item) => matches(item, filter));
         if (!doc) return { matchedCount: 0 };
         Object.assign(doc, update.$set ?? {});
+        for (const key of Object.keys(update.$unset ?? {})) delete doc[key];
         for (const [key, value] of Object.entries(update.$inc ?? {})) doc[key] += value;
         for (const [key, value] of Object.entries(update.$push ?? {})) doc[key] = [...(doc[key] ?? []), ...value.$each].slice(value.$slice);
         return { matchedCount: 1 };
@@ -65,7 +66,7 @@ async function setup(t) {
   db.collection('nodes').documents.push({ _id: parent, userId: owner, type: 'folder', name: '我的旅行', deletedAt: null });
   const send = (method, path, payload, headers = {}) => app.inject({ method, url: `/api/v1/phone-uploads${path}`, payload, headers });
   const create = async () => send('POST', '', { parentId: String(parent) }, { 'x-test-user': String(owner) });
-  return { db, cos, owner, other, parent, send, create };
+  return { app, db, cos, owner, other, parent, send, create };
 }
 
 test('扫码请求需电脑确认，不能跨目录、跨设备或越权完成其他上传', async (t) => {
@@ -148,4 +149,82 @@ test('扫码加入后逾期两端一致，COS 凭证失败不耗尽上传额度'
   const result = await send('POST', `/${id}/credentials`, { name: 'a.jpg', size: 12 }, { authorization: `Bearer ${deviceToken}` });
   assert.equal(result.statusCode, 503);
   assert.equal(pair.issuedCount, 0);
+});
+
+test('笔记扫码须持有二维码、设备令牌并由所属用户批准才可读取指定正文', async (t) => {
+  const { app, db, owner, other, send } = await setup(t);
+  const first = { _id: new ObjectId(), userId: owner, deletedAt: null, title: '第一条', content: '私密正文' };
+  const second = { _id: new ObjectId(), userId: owner, deletedAt: null, title: '第二条', content: '其他正文' };
+  db.collection('notes').documents.push(first, second);
+  const request = (method, path, payload, headers = {}) => app.inject({ method, url: `/api/v1/note-pairs${path}`, payload, headers });
+  const ownerHeader = { 'x-test-user': String(owner) };
+  const otherHeader = { 'x-test-user': String(other) };
+  assert.equal((await request('POST', '', { noteId: String(first._id) })).statusCode, 401);
+  assert.equal((await request('POST', '', { noteId: String(first._id) }, otherHeader)).statusCode, 404);
+  const created = await request('POST', '', { noteId: String(first._id) }, ownerHeader);
+  assert.equal(created.statusCode, 201, created.body);
+  const { id, secret } = created.json();
+  const pair = db.collection('note_read_pairs').documents[0];
+  assert.ok(!JSON.stringify(pair).includes(secret));
+  assert.equal((await request('GET', `/active?noteId=${first._id}`, undefined, ownerHeader)).json().id, id);
+  assert.equal((await request('GET', `/active?noteId=${first._id}`, undefined, otherHeader)).statusCode, 404);
+  assert.equal((await request('GET', `/active?noteId=${second._id}`, undefined, ownerHeader)).json().id, null);
+  const deviceToken = 'a'.repeat(43);
+  const bearer = { authorization: `Bearer ${deviceToken}` };
+  assert.equal((await request('POST', `/${id}/join`, { secret: 'b'.repeat(43), deviceToken })).statusCode, 410);
+  const joined = await request('POST', `/${id}/join`, { secret, deviceToken });
+  assert.equal(joined.statusCode, 200, joined.body);
+  assert.match(joined.json().code, /^\d{6}$/);
+  assert.equal((await request('POST', `/${id}/join`, { secret, deviceToken })).json().code, joined.json().code);
+  assert.equal((await request('POST', `/${id}/join`, { secret, deviceToken: 'c'.repeat(43) })).statusCode, 410);
+  assert.equal((await request('GET', `/${id}/note`, undefined, bearer)).statusCode, 410);
+  assert.equal((await request('GET', `/${id}`, undefined, otherHeader)).statusCode, 404);
+  assert.equal((await request('POST', `/${id}/approve`, {}, otherHeader)).statusCode, 404);
+  assert.equal((await request('GET', `/${id}`, undefined, ownerHeader)).json().code, joined.json().code);
+  assert.equal((await request('POST', `/${id}/approve`, {}, ownerHeader)).statusCode, 200);
+  assert.equal(pair.noteSnapshot.content, '私密正文');
+  assert.equal(pair.expiresAt.getTime(), pair.approvedUntil.getTime());
+  assert.equal((await request('POST', `/${id}/approve`, {}, ownerHeader)).statusCode, 409);
+  assert.equal((await request('GET', `/active?noteId=${first._id}`, undefined, ownerHeader)).json().id, id);
+  assert.equal((await request('GET', `/${id}/status`, undefined, bearer)).json().status, 'approved');
+  first.title = '批准后的新标题'; first.content = '批准后新增的敏感段落';
+  const read = await request('GET', `/${id}/note`, undefined, bearer);
+  assert.equal(read.statusCode, 200, read.body);
+  assert.match(read.headers['cache-control'], /no-store/);
+  assert.equal(read.json().note.content, '私密正文');
+  assert.equal(read.json().note.title, '第一条');
+  assert.ok(!read.body.includes('批准后新增的敏感段落'));
+  assert.ok(!read.body.includes('其他正文'));
+  assert.equal((await request('GET', `/${id}/note`, undefined, { authorization: `Bearer ${'d'.repeat(43)}` })).statusCode, 403);
+  assert.equal((await send('POST', `/${id}/credentials`, { name: 'a.jpg', size: 12 }, bearer)).statusCode, 403);
+  assert.equal((await request('POST', `/${id}/revoke`, {}, ownerHeader)).statusCode, 200);
+  assert.equal(pair.noteSnapshot, undefined);
+  assert.equal((await request('GET', `/active?noteId=${first._id}`, undefined, ownerHeader)).json().id, null);
+  assert.equal((await request('GET', `/${id}/note`, undefined, bearer)).statusCode, 403);
+});
+
+test('笔记配对的二维码过期、授权过期和笔记删除均禁止移动设备读取', async (t) => {
+  const { app, db, owner } = await setup(t);
+  const note = { _id: new ObjectId(), userId: owner, deletedAt: null, title: '记录', content: '仅用于当前设备' };
+  db.collection('notes').documents.push(note);
+  const request = (method, path, payload, headers = {}) => app.inject({ method, url: `/api/v1/note-pairs${path}`, payload, headers });
+  const ownerHeader = { 'x-test-user': String(owner) };
+  const created = (await request('POST', '', { noteId: String(note._id) }, ownerHeader)).json();
+  const pair = db.collection('note_read_pairs').documents[0];
+  const deviceToken = 'e'.repeat(43);
+  const bearer = { authorization: `Bearer ${deviceToken}` };
+  pair.joinUntil = new Date(Date.now() - 1);
+  assert.equal((await request('POST', `/${created.id}/join`, { secret: created.secret, deviceToken })).statusCode, 410);
+  pair.joinUntil = new Date(Date.now() + 60_000);
+  assert.equal((await request('POST', `/${created.id}/join`, { secret: created.secret, deviceToken })).statusCode, 200);
+  pair.joinUntil = new Date(Date.now() - 1);
+  assert.equal((await request('POST', `/${created.id}/approve`, {}, ownerHeader)).statusCode, 409);
+  pair.joinUntil = new Date(Date.now() + 60_000);
+  assert.equal((await request('POST', `/${created.id}/approve`, {}, ownerHeader)).statusCode, 200);
+  pair.approvedUntil = new Date(Date.now() - 1);
+  assert.equal((await request('GET', `/${created.id}/status`, undefined, bearer)).json().status, 'expired');
+  assert.equal((await request('GET', `/${created.id}/note`, undefined, bearer)).statusCode, 410);
+  pair.approvedUntil = new Date(Date.now() + 60_000);
+  note.deletedAt = new Date();
+  assert.equal((await request('GET', `/${created.id}/note`, undefined, bearer)).statusCode, 404);
 });

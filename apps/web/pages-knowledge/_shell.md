@@ -1,22 +1,22 @@
 # 工作空间统一导航
 
-- 范围：导航仅出现在登录后私有页面（首页、文件、足迹地图、上传、我的分享、我的账号及私有详情页）；公开分享、登录、注册使用独立外壳，不显示私有菜单。PWA 更新提示则可出现在 `/app/` 的所有路由。
-- 页面归属：`router.tsx` 的 `handle.navigation` 决定当前主菜单；首页→`home`，文件目录及素材预览→`files`，足迹地图→`map`，上传→`upload`，分享列表/新建/编辑→`shares`，账号→`account`。
+- 范围：导航仅出现在登录后私有页面（首页、文件、足迹地图、上传、随手记、我的分享、我的账号及私有详情页）；公开分享、手机取笔记、登录、注册使用独立外壳，不显示私有菜单。PWA 更新提示则可出现在 `/app/` 的所有路由。
+- 页面归属：`router.tsx` 的 `handle.navigation` 决定当前主菜单；首页→`home`，文件目录及素材预览→`files`，足迹地图→`map`，上传→`upload`，随手记→`notes`，分享列表/新建/编辑→`shares`，账号→`account`。
 
 ## 页面区域
 
 | region | 内容 |
 |---|---|
-| `nav.desktop` | 固定顺序：首页、全部文件、足迹地图、上传素材、我的分享、我的；下方分隔为准备中且禁用的旅行、回收站。所在项用 `aria-current="page"` 标识。 |
-| 各页面的 `*.mobileNav` | 同一顺序的六个可用入口：首页、文件、足迹、上传、分享、我的；准备中功能不占移动底栏位置。 |
+| `nav.desktop` | 固定顺序：首页、全部文件、足迹地图、上传素材、随手记、我的分享、我的；下方分隔为准备中且禁用的旅行、回收站。所在项用 `aria-current="page"` 标识。 |
+| 各页面的 `*.mobileNav` | 同一顺序的七个可用入口：首页、文件、足迹、上传、随手记、分享、我的；准备中功能不占移动底栏位置。 |
 | `shell.update` | 全站右下角 | `/app/` 应用有可用新版本时出现的更新提示；包括稍后和用户主动立即更新。公开路由也可能看到。 |
 
 ## 可执行动作
 
 | data-agent-id / 工具名 | 类型 | 作用 | 参数 | 危险 |
 |---|---|---|---|---|
-| `nav.home`、`nav.files`、`nav.map`、`nav.upload`、`nav.shares`、`nav.account` | 链接 | 前往对应工作区一级页面；文件入口返回根目录 | 无 | 否 |
-| `nav.mobile.home`、`.files`、`.map`、`.upload`、`.shares`、`.account` | 链接 | 移动端同序入口，当前态由路由归属确定 | 无 | 否 |
+| `nav.home`、`nav.files`、`nav.map`、`nav.upload`、`nav.notes`、`nav.shares`、`nav.account` | 链接 | 前往对应工作区一级页面；文件入口返回根目录 | 无 | 否 |
+| `nav.mobile.home`、`.files`、`.map`、`.upload`、`.notes`、`.shares`、`.account` | 链接 | 移动端同序入口，当前态由路由归属确定 | 无 | 否 |
 | `nav.trips`、`nav.trash` | 禁用按钮 | 未接入的一级功能不可进入 | 无 | 否 |
 | `nav.home.brand` | 链接 | 桌面品牌入口返回首页 | 无 | 否 |
 | `shell.update.later` | 按钮 | 隐藏新版本提示；下次回到标签页可再次看到 | 无 | 否 |
