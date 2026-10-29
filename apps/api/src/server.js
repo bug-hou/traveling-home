@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import nodeRoutes from './routes/nodes.js';
 import shareRoutes from './routes/shares.js';
 import homeRoutes from './routes/home.js';
+import mapRoutes from './routes/map.js';
 import uploadRoutes from './routes/uploads.js';
 import phoneUploadRoutes from './routes/phone-uploads.js';
 import { createCosService } from './services/cos.js';
@@ -98,6 +99,12 @@ export async function buildApp({ cfg, db }) {
   await app.register(homeRoutes, {
     prefix: '/api/v1',
     db,
+    requireAuth,
+  });
+  await app.register(mapRoutes, {
+    prefix: '/api/v1',
+    db,
+    cfg,
     requireAuth,
   });
   await app.register(shareRoutes, {

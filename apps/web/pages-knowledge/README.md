@@ -21,6 +21,7 @@
 | `upload` | `/upload` | 上传素材与队列（含电脑扫码授权、手机上传结果） | `upload.md` |
 | `phoneUpload` | `/phone-upload/:id` | 手机免登录扫码、等待电脑批准及 COS 直传 | `phoneUpload.md` |
 | `files` | `/files/:folderId?` | 文件浏览与管理，打开文件进入详情 | `files.md` |
+| `map` | `/map` | 本人已定位素材点位与未定位列表 | `map.md` |
 | `preview` | `/preview/:nodeId` | 私有素材预览、自动位置来源与手动标记 | `preview.md` |
 | `shares` | `/shares`、`/shares/new?targetId=...`、`/shares/:id/edit` | 网盘式分享管理、状态筛选及配置 | `shares.md` |
 | `publicShare` | `/s/:handle/:slug`、`/:handle/:slug` | 公开目录浏览与活动作品展示 | `publicShare.md` |

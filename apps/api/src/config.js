@@ -80,5 +80,6 @@ export function loadConfig(env = process.env) {
     refreshTtlDays: int(env.REFRESH_TOKEN_TTL_DAYS, 30),
     cos: loadCosConfig(env),
     imageProcessingEnabled: bool(env.COS_IMAGE_PROCESSING_ENABLED, false),
+    mapServerKey: String(env.TENCENT_MAP_SERVER_KEY ?? '').trim(),
   });
 }

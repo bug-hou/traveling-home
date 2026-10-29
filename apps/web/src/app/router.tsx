@@ -6,6 +6,7 @@ import AccountPage from '@/pages/AccountPage';
 import AuthPage from '@/pages/AuthPage';
 
 const HomePage = lazy(() => import('@/pages/HomePage'));
+const MapPage = lazy(() => import('@/pages/MapPage'));
 const UploadPage = lazy(() => import('@/pages/UploadPage'));
 const FilesPage = lazy(() => import('@/pages/FilesPage'));
 const PreviewPage = lazy(() => import('@/pages/PreviewPage'));
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
           { path: 'settings/account', element: <AccountPage />, handle: { agent: { pageId: 'account' }, navigation: 'account' } },
           { path: 'upload', element: <Suspense fallback={<main className="auth-loading">正在打开上传空间…</main>}><UploadPage /></Suspense>, handle: { agent: { pageId: 'upload' }, navigation: 'upload' } },
           { path: 'files/:folderId?', element: <Suspense fallback={<main className="auth-loading">正在打开文件空间…</main>}><FilesPage /></Suspense>, handle: { agent: { pageId: 'files' }, navigation: 'files' } },
+          { path: 'map', element: <Suspense fallback={<main className="auth-loading">正在打开足迹地图…</main>}><MapPage /></Suspense>, handle: { agent: { pageId: 'map' }, navigation: 'map' } },
           { path: 'preview/:nodeId', element: <Suspense fallback={<main className="auth-loading">正在打开素材…</main>}><PreviewPage /></Suspense>, handle: { agent: { pageId: 'preview' }, navigation: 'files' } },
           { path: 'shares', element: <Suspense fallback={<main className="auth-loading">正在打开我的分享…</main>}><SharesPage /></Suspense>, handle: { agent: { pageId: 'shares' }, navigation: 'shares' } },
           { path: 'shares/new', element: <Suspense fallback={<main className="auth-loading">正在打开分享配置…</main>}><SharesPage /></Suspense>, handle: { agent: { pageId: 'shares' }, navigation: 'shares' } },

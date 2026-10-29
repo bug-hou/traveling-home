@@ -134,7 +134,7 @@ export default function PreviewPage() {
       const result = await nodesApi.saveLocation(node.id, { latitude: lat, longitude: lng, placeName: place || null });
       setLocation(result.location);
       setEditor(false);
-      setNotice('位置已保存到你的私有素材；足迹地图与县级归属仍在建设中。');
+      setNotice('位置已保存到你的私有素材；足迹地图会显示这一点位，县级归属将在下一步接入。');
     } catch (error) { setFormError(errorMessage(error)); }
     finally { setSaving(false); }
   }
@@ -178,7 +178,7 @@ export default function PreviewPage() {
           </section>
           <div className="preview-details">
             <section className="preview-card" data-agent-region="preview.details"><div className="preview-card-title"><span>▤</span><div><small>THE DETAILS</small><h2>文件信息</h2></div></div><dl><div><dt>文件类型</dt><dd>{node.mime || '未知'}</dd></div><div><dt>文件大小</dt><dd>{formatSize(node.size)}</dd></div><div><dt>上传时间</dt><dd>{node.uploadedAt ? new Date(node.uploadedAt).toLocaleString('zh-CN') : '未知'}</dd></div><div><dt>拍摄时间</dt><dd>待解析</dd></div><div><dt>拍摄设备</dt><dd>待解析</dd></div></dl><p>仅新上传 JPEG 的 EXIF GPS 和同批唯一匹配的 DJI SRT 可用于自动定位；拍摄时间与设备仍未解析。</p></section>
-            <section className="preview-card preview-location" data-agent-region="preview.location"><div className="preview-card-title"><span>⌖</span><div><small>WHERE IT HAPPENED</small><h2>拍摄位置</h2></div><em>{location ? locationSourceLabel[location.source] : '未定位'}</em></div><div className="preview-map-placeholder" aria-label="位置示意，未接入真实地图"><span aria-hidden="true">⌖</span><small>地图选点准备中 · 此处不是实际地图</small></div><div className="preview-location-info"><div><small>当前位置</small><strong>{location ? location.placeName || '已定位坐标' : '未定位'}</strong><span>{location ? `${coordinate(location.longitude, '东经', '西经', '经度')}，${coordinate(location.latitude, '北纬', '南纬', '纬度')}` : '可通过经纬度手动标记'}</span></div>{(mediaKind(node.mime, node.name) === '照片' || mediaKind(node.mime, node.name) === '视频') && <button type="button" data-agent-id="preview.location.edit" onClick={openEditor}>{location ? '修改位置' : '手动标记'}</button>}</div><p>自动与手动位置均为 WGS-84；手动标记优先，足迹地图与县级归属尚未接通。</p></section>
+            <section className="preview-card preview-location" data-agent-region="preview.location"><div className="preview-card-title"><span>⌖</span><div><small>WHERE IT HAPPENED</small><h2>拍摄位置</h2></div><em>{location ? locationSourceLabel[location.source] : '未定位'}</em></div><div className="preview-map-placeholder" aria-label="位置示意，未接入真实地图"><span aria-hidden="true">⌖</span><small>地图选点准备中 · 此处不是实际地图</small></div><div className="preview-location-info"><div><small>当前位置</small><strong>{location ? location.placeName || '已定位坐标' : '未定位'}</strong><span>{location ? `${coordinate(location.longitude, '东经', '西经', '经度')}，${coordinate(location.latitude, '北纬', '南纬', '纬度')}` : '可通过经纬度手动标记'}</span></div>{(mediaKind(node.mime, node.name) === '照片' || mediaKind(node.mime, node.name) === '视频') && <button type="button" data-agent-id="preview.location.edit" onClick={openEditor}>{location ? '修改位置' : '手动标记'}</button>}</div><p>自动与手动位置均为 WGS-84；手动标记后可在足迹地图看到点位；县级归属暂未接通。</p>{location && <Link to="/map" data-agent-id="preview.location.viewMap">在足迹地图中查看 →</Link>}</section>
           </div>
         </div>}
         {notice && <p className="preview-notice" role="status">{notice}</p>}
