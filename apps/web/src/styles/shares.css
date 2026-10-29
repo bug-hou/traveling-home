@@ -166,6 +166,9 @@
 @media(max-width:1030px) and (min-width:761px){.share-sidebar .workspace-nav :is(a,button){justify-content:center;padding:0;font-size:0}.share-sidebar .workspace-nav-label{display:none}}
 .share-mobile-nav a { align-content:center; }
 .share-mobile-nav a>span { font-size:19px; }
+.share-mobile-nav a { min-width:0; flex:1 1 0; }
+.share-mobile-nav a>small { white-space:nowrap; }
+@media(max-width:390px){.share-mobile-nav a>span{font-size:17px}.share-mobile-nav a>small{font-size:10px}}
 .public-folder-back { min-height:38px; margin:12px 24px 4px; padding:0 10px; border:1px solid var(--j-line); border-radius:7px; background:#fff; color:#3c6d53; font-size:12px; font-weight:650; }
 .public-folder-back:hover { background:var(--j-soft); }
 .share-qr-modal { width:min(420px,calc(100vw - 32px)); text-align:center; }

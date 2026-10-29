@@ -43,13 +43,15 @@ export default function PublicSharePage() {
     let active = true;
     setLoading(true);
     setError('');
+    if (offset === 0 && !folderId) { setNoteData(null); setNoteCopied(false); }
     const request = sharesApi.browse(handle, slug, password, folderId, offset).then(async (result) => {
       if (!active) return;
       if (result.share.targetType === 'note') {
+        setData(null);
+        setNoteData(null);
         const response = await sharesApi.readNote(handle, slug, password);
         if (!active) return;
         setNoteData(response);
-        setData(null);
       } else {
         setNoteData(null);
         setData((previous) => offset && previous ? { ...result, items: [...previous.items, ...result.items] } : result);
@@ -59,9 +61,9 @@ export default function PublicSharePage() {
     });
     request.catch((cause: unknown) => {
       if (!active) return;
-      if (cause instanceof ApiError && cause.code === 'PASSWORD_REQUIRED') { setNeedsPassword(true); setPassword(undefined); setError(password ? '提取码不正确，请重新输入' : ''); }
-      else if (cause instanceof ApiError && cause.status === 401) { setNeedsLogin(true); setError(''); }
-      else setError(message(cause));
+      if (cause instanceof ApiError && cause.code === 'PASSWORD_REQUIRED') { setNoteData(null); setData(null); setNeedsPassword(true); setPassword(undefined); setError(password ? '提取码不正确，请重新输入' : ''); }
+      else if (cause instanceof ApiError && cause.status === 401) { setNoteData(null); setData(null); setNeedsLogin(true); setError(''); }
+      else { setNoteData(null); setData(null); setError(cause instanceof ApiError && cause.code === 'VIEW_LIMIT' ? '这份笔记的阅读次数已用尽，请联系分享者调整上限。' : message(cause)); }
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [handle, slug, password, folderId, offset, retry]);
@@ -136,7 +138,7 @@ export default function PublicSharePage() {
     {needsLogin && <section className="public-gate" data-agent-region="publicShare.gate"><span aria-hidden="true">◇</span><h1>先登录，再继续</h1><p>分享者将这份内容设为仅登录用户可查看。登录后返回这个链接即可。</p><a href={loginUrl} data-agent-id="publicShare.gate.login">前往登录 →</a></section>}
     {needsPassword && <section className="public-gate" data-agent-region="publicShare.gate"><span aria-hidden="true">◇</span><h1>这段旅程有一把钥匙</h1><p>请输入分享者提供的提取码，打开这份作品。</p><form onSubmit={unlock}><label htmlFor="share-code">分享提取码</label><input id="share-code" type="password" value={passwordInput} onChange={(event) => setPasswordInput(event.target.value)} minLength={4} maxLength={128} autoComplete="off" data-agent-id="publicShare.gate.password" data-agent-ignore="true" required /><Button htmlType="submit" type="primary" data-agent-id="publicShare.gate.submit">打开分享</Button></form>{error && <p role="alert">{error}</p>}</section>}
     {!needsPassword && !needsLogin && error && !data && !noteData && <section className="public-gate" role="alert"><span aria-hidden="true">⌁</span><h1>暂时打不开这个分享</h1><p>{error}</p><button type="button" onClick={() => { setError(''); setRetry((value) => value + 1); }} data-agent-id="publicShare.error.retry">重试</button></section>}
-    {noteData && !needsPassword && !needsLogin && <article className="public-note-layout" data-agent-region="publicShare.note"><div className="public-note-heading"><small>文字分享 / READ ONLY</small><span>{noteData.share.ownerName || '旅人'} 分享的笔记</span><h1>{noteData.share.title || noteData.note.title}</h1><p>{noteData.share.description || '把此刻的想法，与你分享。'}</p><span>{noteData.share.expiresAt ? `有效期至 ${new Date(noteData.share.expiresAt).toLocaleString('zh-CN')}` : '长期有效'}</span></div><section className="public-note-content"><h2>{noteData.note.title}</h2><p>{noteData.note.content}</p></section><div className="public-note-actions"><Button htmlType="button" type="primary" data-agent-id="publicShare.note.copy" onClick={() => void copyNote()}>{noteCopied ? '已复制正文' : '复制正文'}</Button><span>公开链接只供阅读；复制后内容无法远程收回。</span></div>{error && <p role="alert" className="share-alert">{error}</p>}</article>}
+    {noteData && !needsPassword && !needsLogin && <article className="public-note-layout" data-agent-region="publicShare.note"><div className="public-note-heading"><small>文字分享 / READ ONLY</small><span>{noteData.share.ownerName || '旅人'} 分享的笔记</span><h1>{noteData.share.title || noteData.note.title}</h1><p>{noteData.share.description || '把此刻的想法，与你分享。'}</p><span>{noteData.share.expiresAt ? `有效期至 ${new Date(noteData.share.expiresAt).toLocaleString('zh-CN')}` : '长期有效'}</span></div><section className="public-note-content"><h2>{noteData.note.title}</h2><p data-agent-ignore="true">{noteData.note.content}</p></section><div className="public-note-actions"><Button htmlType="button" type="primary" data-agent-id="publicShare.note.copy" onClick={() => void copyNote()}>{noteCopied ? '已复制正文' : '复制正文'}</Button><span>公开链接只供阅读；复制后内容无法远程收回。</span></div>{error && <p role="alert" className="share-alert">{error}</p>}</article>}
     {data && data.root && <div className="public-layout">
       <section className="public-hero" data-agent-region="publicShare.hero"><div className="public-hero-content"><div className="public-owner"><span className="public-owner-avatar" aria-hidden="true">{(data.share.ownerName || '旅').slice(0, 1)}</span><span><b>{data.share.ownerName}</b> 分享给你的{data.share.mode === 'activity' ? '活动作品' : '文件'}</span></div><h1>{data.share.title}</h1><p>{data.share.description || '把一路的风景，留在这里与你分享。'}</p><div className="public-hero-meta"><span>◇ {data.root.type === 'folder' ? '文件夹分享' : '文件分享'}</span><span>◷ {data.share.expiresAt ? `有效期至 ${new Date(data.share.expiresAt).toLocaleString('zh-CN')}` : '长期有效'}</span>{data.share.allowDownload && <span>↓ 允许下载</span>}</div></div><div className="public-cover" data-agent-ignore="true">{cover ? <img src={cover} alt="分享封面" referrerPolicy="no-referrer" onError={() => setCover(null)} /> : <span aria-hidden="true">{data.share.mode === 'activity' ? '✦' : data.root.type === 'folder' ? '▤' : '▧'}</span>}</div></section>
       <section className="public-gallery" data-agent-region="publicShare.gallery"><div className="public-gallery-heading"><div><small>{data.share.mode === 'activity' ? '作品集' : '分享文件'}</small><h2>{data.root.type === 'file' ? '文件详情' : folderId ? '文件夹内容' : '全部文件'}</h2></div><div className="public-gallery-controls"><span>{data.root.type === 'folder' ? `${data.total} 项内容` : '1 项内容'}</span><div className="public-view-switch" role="group" aria-label="文件视图"><button type="button" onClick={() => setView('list')} aria-label="列表视图" aria-pressed={currentView === 'list'} data-agent-id="publicShare.gallery.listView">☷</button><button type="button" onClick={() => setView('grid')} aria-label="网格视图" aria-pressed={currentView === 'grid'} data-agent-id="publicShare.gallery.gridView">▦</button></div></div></div>

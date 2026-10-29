@@ -21,11 +21,12 @@ export interface Share extends ShareSettings {
   hasPassword: boolean;
   downloadCount: number;
   viewCount: number;
+  maxViews: number | null;
   revokedAt: string | null;
   createdAt: string;
 }
 
-export type ShareInput = ShareSettings & { password?: string | null };
+export type ShareInput = ShareSettings & { password?: string | null; maxViews?: number | null };
 export interface PublicNode {
   id: string;
   parentId: string | null;
@@ -63,8 +64,8 @@ export function shareLink(handle: string, slug: string) {
 
 export const sharesApi = {
   list: () => apiRequest<{ items: Share[]; handle: string | null }>('/api/v1/shares'),
-  create: (targetId: string, input: ShareInput, targetType?: 'note') => apiRequest<{ share: Share; handle: string }>('/api/v1/shares', { method: 'POST', body: JSON.stringify(targetType === 'note' ? { noteId: targetId, slug: input.slug, title: input.title, description: input.description, expiresAt: input.expiresAt, ...(input.password ? { password: input.password } : {}) } : { targetId, ...input }) }),
-  update: (id: string, input: Partial<ShareInput>, targetType?: 'note') => apiRequest<{ share: Share; handle: string }>(`/api/v1/shares/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(targetType === 'note' ? { slug: input.slug, title: input.title, description: input.description, expiresAt: input.expiresAt, ...(Object.hasOwn(input, 'password') ? { password: input.password } : {}) } : input) }),
+  create: (targetId: string, input: ShareInput, targetType?: 'note') => apiRequest<{ share: Share; handle: string }>('/api/v1/shares', { method: 'POST', body: JSON.stringify(targetType === 'note' ? { noteId: targetId, slug: input.slug, title: input.title, description: input.description, expiresAt: input.expiresAt, maxViews: input.maxViews ?? null, ...(input.password ? { password: input.password } : {}) } : { targetId, ...input }) }),
+  update: (id: string, input: Partial<ShareInput>, targetType?: 'note') => apiRequest<{ share: Share; handle: string }>(`/api/v1/shares/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(targetType === 'note' ? { slug: input.slug, title: input.title, description: input.description, expiresAt: input.expiresAt, ...(Object.hasOwn(input, 'maxViews') ? { maxViews: input.maxViews } : {}), ...(Object.hasOwn(input, 'password') ? { password: input.password } : {}) } : input) }),
   revoke: (id: string) => apiRequest<void>(`/api/v1/shares/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   browse: (handle: string, slug: string, password?: string, parentId?: string, offset = 0) => apiRequest<PublicBrowse>(`/api/v1/public/shares/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}/browse`, { method: 'POST', body: JSON.stringify({ ...(password ? { password } : {}), ...(parentId ? { parentId } : {}), offset }) }),
   access: (handle: string, slug: string, nodeId: string, purpose: 'preview' | 'download', password?: string) => apiRequest<NodeAccess>(`/api/v1/public/shares/${encodeURIComponent(handle)}/${encodeURIComponent(slug)}/files/${encodeURIComponent(nodeId)}/access`, { method: 'POST', body: JSON.stringify({ purpose, ...(password ? { password } : {}) }) }),

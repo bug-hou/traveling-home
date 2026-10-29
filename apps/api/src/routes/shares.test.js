@@ -222,6 +222,32 @@ test('笔记分享冻结创建时正文、使用原分享提取码/期限/撤销
   assert.equal((await ctx.browse()).statusCode, 200);
 });
 
+test('笔记分享访问次数上限仅在成功签发正文时原子消耗，文件分享不受影响', async (t) => {
+  const ctx = fixture(); await ctx.ready(); t.after(() => ctx.app.close());
+  const owner = { 'x-test-user': String(ctx.userId) };
+  const note = (await ctx.app.inject({ method: 'POST', url: '/notes', headers: owner, payload: { title: '限定阅读', content: '正文' } })).json().note;
+  assert.equal((await ctx.create({ maxViews: 1 })).statusCode, 400);
+  const created = await ctx.app.inject({ method: 'POST', url: '/shares', headers: owner, payload: { noteId: note.id, slug: 'once', maxViews: 1, password: 'abcd' } });
+  assert.equal(created.statusCode, 201, created.body);
+  assert.equal(created.json().share.maxViews, 1);
+  const shareId = created.json().share.id;
+  const read = (password) => ctx.app.inject({ method: 'POST', url: '/public/shares/traveler/once/note', payload: { password } });
+  assert.equal((await read('wrong')).statusCode, 403);
+  assert.equal((await ctx.app.inject({ method: 'POST', url: '/public/shares/traveler/once/browse', payload: { password: 'abcd' } })).statusCode, 200);
+  assert.equal(ctx.docs.shares[0].viewCount, 0);
+  assert.deepEqual((await Promise.all([read('abcd'), read('abcd')])).map((result) => result.statusCode).sort(), [200, 429]);
+  assert.equal(ctx.docs.shares[0].viewCount, 1);
+  assert.equal((await read('abcd')).json().error.code, 'VIEW_LIMIT');
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/shares/${shareId}`, headers: owner, payload: { maxViews: 0 } })).statusCode, 400);
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/shares/${shareId}`, headers: owner, payload: { maxViews: 2 } })).statusCode, 200);
+  assert.equal((await read('abcd')).statusCode, 200);
+  assert.equal(ctx.docs.shares[0].viewCount, 2);
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/shares/${shareId}`, headers: owner, payload: { maxViews: 1 } })).statusCode, 409);
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/shares/${shareId}`, headers: owner, payload: { maxViews: null } })).statusCode, 200);
+  assert.equal((await read('abcd')).statusCode, 200);
+  assert.equal((await ctx.app.inject({ method: 'PATCH', url: `/shares/${shareId}`, headers: owner, payload: { requireLogin: true } })).statusCode, 400);
+});
+
 test('笔记分享编辑禁止跨站登录，旧文件分享仍支持原有登录设置', async (t) => {
   const ctx = fixture(); await ctx.ready(); t.after(() => ctx.app.close());
   const owner = { 'x-test-user': String(ctx.userId) };

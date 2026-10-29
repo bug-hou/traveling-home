@@ -20,6 +20,7 @@ const settings = z.object({
   allowPreview: z.boolean().optional(),
   allowDownload: z.boolean().optional(),
   maxDownloads: z.number().int().min(1).max(1_000_000).nullable().optional(),
+  maxViews: z.number().int().min(1).max(1_000_000).nullable().optional(),
 }).strict();
 const createBody = settings.extend({ targetId: id.optional(), noteId: id.optional() })
   .refine((body) => Boolean(body.targetId) !== Boolean(body.noteId), '请选择一个分享目标');
@@ -49,7 +50,7 @@ function ownerShare(share) {
     hasPassword: Boolean(share.passwordHash), requireLogin: share.requireLogin,
     expiresAt: share.expiresAt, allowPreview: share.allowPreview, allowDownload: share.allowDownload,
     maxDownloads: share.maxDownloads, downloadCount: share.downloadCount, viewCount: share.viewCount,
-    revokedAt: share.revokedAt, createdAt: share.createdAt,
+    maxViews: share.maxViews ?? null, revokedAt: share.revokedAt, createdAt: share.createdAt,
   };
 }
 
@@ -95,7 +96,11 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
       fail(reply, 409, 'LIMIT_USED', '下载额度不能小于已经签发的次数');
       return null;
     }
-    for (const field of ['slug', 'title', 'description', 'mode', 'requireLogin', 'allowPreview', 'allowDownload', 'maxDownloads']) {
+    if (body.maxViews !== undefined && body.maxViews !== null && body.maxViews < (current?.viewCount ?? 0)) {
+      fail(reply, 409, 'LIMIT_USED', '访问额度不能小于已经阅读的次数');
+      return null;
+    }
+    for (const field of ['slug', 'title', 'description', 'mode', 'requireLogin', 'allowPreview', 'allowDownload', 'maxDownloads', 'maxViews']) {
       if (body[field] !== undefined) changes[field] = body[field];
     }
     if (body.password !== undefined) changes.passwordHash = body.password === null ? null : await hashPassword(body.password);
@@ -167,8 +172,9 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     if (!body) return;
     if (!req.user.publicHandle) return fail(reply, 409, 'HANDLE_REQUIRED', '请先在账号设置中设置公开用户名');
     const isNote = Boolean(body.noteId);
-    if (isNote && (body.mode === 'activity' || body.coverNodeId != null || body.allowPreview === false || body.allowDownload === true || body.maxDownloads != null || body.requireLogin === true)) {
-      return fail(reply, 400, 'INVALID_NOTE_SHARE', '笔记分享不支持活动、封面、下载或跨站登录，请使用提取码');
+    if (isNote && (body.mode === 'activity' || body.coverNodeId != null || body.allowPreview === false || body.allowDownload === true || body.maxDownloads != null || body.requireLogin === true)
+      || !isNote && body.maxViews !== undefined) {
+      return fail(reply, 400, 'INVALID_NOTE_SHARE', '访问次数上限仅适用于笔记；笔记分享不支持活动、封面、下载或跨站登录，请使用提取码');
     }
     const targetId = new ObjectId(body.noteId ?? body.targetId);
     const target = isNote
@@ -189,6 +195,7 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
       requireLogin: changes.requireLogin ?? false, expiresAt: changes.expiresAt ?? null,
       allowPreview: changes.allowPreview ?? true, allowDownload: isNote ? false : changes.allowDownload ?? true,
       maxDownloads: isNote ? null : changes.maxDownloads ?? null, downloadCount: 0, viewCount: 0,
+      maxViews: isNote ? changes.maxViews ?? null : null,
       revokedAt: null, createdAt: now, updatedAt: now,
     };
     if (!share.allowPreview && !share.allowDownload) return fail(reply, 400, 'NO_ACCESS', '预览和下载至少开启一项');
@@ -212,8 +219,9 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     const _id = new ObjectId(req.params.id);
     const current = await shares.findOne({ _id, userId: req.user._id, revokedAt: null });
     if (!current) return fail(reply, 404, 'SHARE_NOT_FOUND', '分享不存在');
-    if (current.targetType === 'note' && (body.mode === 'activity' || body.coverNodeId != null || body.allowPreview === false || body.allowDownload === true || body.maxDownloads != null || body.requireLogin === true)) {
-      return fail(reply, 400, 'INVALID_NOTE_SHARE', '笔记分享不支持活动、封面、下载或跨站登录，请使用提取码');
+    if (current.targetType === 'note' && (body.mode === 'activity' || body.coverNodeId != null || body.allowPreview === false || body.allowDownload === true || body.maxDownloads != null || body.requireLogin === true)
+      || current.targetType !== 'note' && body.maxViews !== undefined) {
+      return fail(reply, 400, 'INVALID_NOTE_SHARE', '访问次数上限仅适用于笔记；笔记分享不支持活动、封面、下载或跨站登录，请使用提取码');
     }
     const changes = await settingsUpdate(body, current, reply);
     if (!changes) return;
@@ -223,10 +231,12 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     if (!await validCover(current, changes.coverNodeId === undefined ? current.coverNodeId : changes.coverNodeId)) return fail(reply, 400, 'INVALID_COVER', '封面须为分享范围内不超过 2 MiB 的图片');
     try {
       const updated = await shares.findOneAndUpdate(
-        { _id, userId: req.user._id, revokedAt: null, ...(changes.maxDownloads == null ? {} : { downloadCount: { $lte: changes.maxDownloads } }) },
+        { _id, userId: req.user._id, revokedAt: null,
+          ...(changes.maxDownloads == null ? {} : { downloadCount: { $lte: changes.maxDownloads } }),
+          ...(changes.maxViews == null ? {} : { viewCount: { $lte: changes.maxViews } }) },
         { $set: { ...changes, updatedAt: new Date() } }, { returnDocument: 'after' },
       );
-      if (!updated) return fail(reply, 409, 'LIMIT_USED', '下载额度已变化，请重试');
+      if (!updated) return fail(reply, 409, 'LIMIT_USED', '访问或下载额度已变化，请重试');
       return { share: ownerShare(updated), handle: req.user.publicHandle };
     } catch (error) {
       if (error?.code === 11000) return fail(reply, 409, 'SLUG_TAKEN', '此自定义路径已被使用');
@@ -274,10 +284,21 @@ export default async function shareRoutes(app, { db, cfg, cos, requireAuth }) {
     if (share.targetType !== 'note' || !share.allowPreview) return fail(reply, 404, 'SHARE_NOT_FOUND', '笔记分享不存在');
     const now = new Date();
     const active = await shares.updateOne(
-      { _id: share._id, targetType: 'note', allowPreview: true, revokedAt: null, $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
+      { _id: share._id, targetType: 'note', allowPreview: true, revokedAt: null, maxViews: share.maxViews ?? null,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+        ...(share.maxViews == null ? {} : { viewCount: { $lt: share.maxViews } }) },
       { $inc: { viewCount: 1 } },
     );
-    if (!active.matchedCount || !await notes.findOne({ _id: share.targetId, userId: share.userId, deletedAt: null })) {
+    if (!active.matchedCount) {
+      const latest = await shares.findOne({ _id: share._id, targetType: 'note', revokedAt: null,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] });
+      if (!latest) return fail(reply, 404, 'SHARE_NOT_FOUND', '笔记分享已失效');
+      if (latest.maxViews != null && latest.viewCount >= latest.maxViews) {
+        return fail(reply, 429, 'VIEW_LIMIT', '笔记分享阅读次数已用尽');
+      }
+      return fail(reply, 409, 'SHARE_CHANGED', '分享设置已更新，请重试');
+    }
+    if (!await notes.findOne({ _id: share.targetId, userId: share.userId, deletedAt: null })) {
       return fail(reply, 404, 'SHARE_NOT_FOUND', '笔记分享已失效');
     }
     return {

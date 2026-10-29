@@ -8,8 +8,10 @@ import QRCode from 'qrcode';
 import { useAuth } from '@/features/auth/AuthProvider';
 import { nodesApi } from '@/services/nodes';
 import type { NodeSummary } from '@/services/nodes';
-import { filterShares, notesApi, shareLink, shareStatus, sharesApi } from '@/services/shares';
-import type { NoteSummary, Share, ShareFilter, ShareInput } from '@/services/shares';
+import { notesApi } from '@/services/notes';
+import type { PrivateNote } from '@/services/notes';
+import { filterShares, shareLink, shareStatus, sharesApi } from '@/services/shares';
+import type { Share, ShareFilter, ShareInput } from '@/services/shares';
 import '@/styles/shares.css';
 
 function localTime(value: string | null) {
@@ -37,7 +39,7 @@ export default function SharesPage() {
   const [listFilter, setListFilter] = useState<ShareFilter>('all');
   const [listQuery, setListQuery] = useState('');
   const [target, setTarget] = useState<NodeSummary | null>(null);
-  const [noteTarget, setNoteTarget] = useState<NoteSummary | null>(null);
+  const [noteTarget, setNoteTarget] = useState<PrivateNote | null>(null);
   const [selected, setSelected] = useState<Share | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,6 +58,8 @@ export default function SharesPage() {
   const [allowDownload, setAllowDownload] = useState(true);
   const [unlimited, setUnlimited] = useState(true);
   const [maxDownloads, setMaxDownloads] = useState('');
+  const [unlimitedViews, setUnlimitedViews] = useState(true);
+  const [maxViews, setMaxViews] = useState('');
   const [coverNodeId, setCoverNodeId] = useState<string | null>(null);
   const [coverFolderId, setCoverFolderId] = useState<string | null>(null);
   const [coverFolders, setCoverFolders] = useState<NodeSummary[]>([]);
@@ -74,7 +78,7 @@ export default function SharesPage() {
     Promise.all([
       sharesApi.list(),
       creating && targetId && !creatingNote ? nodesApi.detail(targetId) : Promise.resolve(null),
-      creating && targetId && creatingNote ? notesApi.list().then(({ items }) => items.find((item) => item.id === targetId) ?? null) : Promise.resolve(null),
+      creating && targetId && creatingNote ? notesApi.detail(targetId).then(({ note }) => note) : Promise.resolve(null),
     ]).then(([list, detail, note]) => {
       if (!active) return;
       setShares(list.items);
@@ -101,6 +105,8 @@ export default function SharesPage() {
         setAllowDownload(share.allowDownload);
         setUnlimited(share.maxDownloads === null);
         setMaxDownloads(share.maxDownloads === null ? '' : String(share.maxDownloads));
+        setUnlimitedViews(share.maxViews == null);
+        setMaxViews(share.maxViews == null ? '' : String(share.maxViews));
         setCoverNodeId(share.coverNodeId);
         setCoverFolderId(share.targetType === 'folder' ? share.targetId : null);
       }
@@ -127,6 +133,7 @@ export default function SharesPage() {
     if (!isNote && !allowPreview && !allowDownload) { setError('预览和下载至少开启一项'); return; }
     if (!neverExpires && (!expires || new Date(expires).getTime() <= Date.now())) { setError('请选择未来的到期时间'); return; }
     if (!isNote && !unlimited && (!Number.isInteger(Number(maxDownloads)) || Number(maxDownloads) < 1)) { setError('请输入至少 1 次的下载限额'); return; }
+    if (isNote && !unlimitedViews && (!maxViews || !Number.isInteger(Number(maxViews)) || Number(maxViews) < Math.max(1, selected?.viewCount ?? 1) || Number(maxViews) > 1_000_000)) { setError(`访问上限应为已阅读次数以上的整数，最多 100 万次`); return; }
     if (!creating && !selected) return;
     const input: ShareInput = {
       slug: slug.trim().toLowerCase() || `journey-${crypto.randomUUID().slice(0, 12)}`,
@@ -134,6 +141,7 @@ export default function SharesPage() {
       coverNodeId: isNote ? null : mode === 'activity' ? coverNodeId : null,
       requireLogin: isNote ? false : requireLogin, expiresAt: neverExpires ? null : new Date(expires).toISOString(),
       allowPreview: isNote ? true : allowPreview, allowDownload: isNote ? false : allowDownload, maxDownloads: isNote || unlimited ? null : Number(maxDownloads),
+      ...(isNote ? { maxViews: unlimitedViews ? null : Number(maxViews) } : {}),
       ...(password ? { password } : removePassword && selected ? { password: null } : {}),
     };
     setBusy(true);
@@ -180,6 +188,14 @@ export default function SharesPage() {
     link.click();
   }
 
+  async function copyQr() {
+    if (!qrImage || !qrShare) return;
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': fetch(qrImage).then((response) => response.blob()) })]);
+      setNotice('二维码图片已复制');
+    } catch { setError('当前浏览器无法复制二维码图片，请下载 PNG 后分享'); }
+  }
+
   return <div className="share-workspace">
     <aside className="share-sidebar" aria-label="工作空间侧栏" data-agent-region="shares.sidebar">
       <Link to="/" className="share-brand" data-agent-id="nav.home.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" /><strong>迹光</strong><span>个人空间</span></Link>
@@ -206,8 +222,8 @@ export default function SharesPage() {
             <div className="share-list-labels" aria-hidden="true"><span>名称 / 地址</span><span>访问数据</span><span>有效期</span><span>操作</span></div>
             {filteredShares.length === 0 ? <div className="share-no-results" role="status">没有找到符合条件的分享，试试其他状态或关键词。</div> : filteredShares.map((share) => { const status = shareStatus(share); return <article className="share-list-card" key={share.id} data-agent-region={`shares.row.${share.id}`}>
               <div className="share-list-details"><span className={`share-list-icon share-list-icon--${share.mode}`} aria-hidden="true">{share.targetType === 'note' ? '✎' : share.mode === 'activity' ? '✦' : share.targetType === 'folder' ? '▤' : '▧'}</span><div className="share-list-copy"><div className="share-list-name"><h3 title={share.title}>{share.title}</h3><span className={`share-status share-status--${status}`}>{status === 'active' ? '生效中' : status === 'expired' ? '已过期' : '已取消'}</span></div><p title={share.slug}>{user?.publicHandle ?? '用户名'}/{share.slug}</p><small>{share.targetType === 'note' ? '文字笔记' : share.mode === 'activity' ? '活动展示' : share.targetType === 'folder' ? '文件夹' : '文件'}{share.hasPassword ? ' · 提取码' : ''}{share.requireLogin ? ' · 需登录' : ''} · 创建于 {new Date(share.createdAt).toLocaleDateString('zh-CN')}</small></div></div>
-              <div className="share-list-metrics"><span>访问 <b>{share.viewCount}</b> 次</span>{share.targetType !== 'note' && <span>下载签发 <b>{share.downloadCount}{share.maxDownloads !== null ? ` / ${share.maxDownloads}` : ''}</b> 次</span>}</div>
-              <div className="share-list-expiry"><span>{share.expiresAt ? new Date(share.expiresAt).toLocaleDateString('zh-CN') : '永不过期'}</span><small>{share.allowDownload ? '允许下载' : '仅可浏览'}</small></div>
+              <div className="share-list-metrics"><span>{share.targetType === 'note' ? '已阅读' : '访问'} <b>{share.viewCount}{share.targetType === 'note' && share.maxViews !== null ? ` / ${share.maxViews}` : ''}</b> 次</span>{share.targetType !== 'note' && <span>下载签发 <b>{share.downloadCount}{share.maxDownloads !== null ? ` / ${share.maxDownloads}` : ''}</b> 次</span>}</div>
+              <div className="share-list-expiry"><span>{share.expiresAt ? new Date(share.expiresAt).toLocaleDateString('zh-CN') : '永不过期'}</span><small>{share.targetType === 'note' ? share.maxViews !== null && share.viewCount >= share.maxViews ? '访问次数已用尽' : '只读笔记' : share.allowDownload ? '允许下载' : '仅可浏览'}</small></div>
               <div className="share-list-actions">{status !== 'revoked' && <><button type="button" className="share-action-main" onClick={() => void copy(share)} data-agent-id={`shares.row.${share.id}.copy`}>复制链接</button><button type="button" onClick={() => void showQr(share)} data-agent-id={`shares.row.${share.id}.qr`}>二维码</button><a href={shareLink(user?.publicHandle ?? '', share.slug)} target="_blank" rel="noopener noreferrer" data-agent-id={`shares.row.${share.id}.open`}>打开 ↗</a><Link to={`/shares/${share.id}/edit`} data-agent-id={`shares.row.${share.id}.edit`}>设置</Link><button type="button" className="share-danger" onClick={() => void revoke(share)} data-agent-id={`shares.row.${share.id}.revoke`} data-agent-danger="true">取消</button></>}</div>
             </article>; })}
           </>}
@@ -225,10 +241,10 @@ export default function SharesPage() {
         <section className="share-panel"><div className="share-section-title"><span>03</span><div><h2>访问权限</h2><p>{isNote ? '设置提取码和有效期，分享页仅允许只读复制。' : '谁能打开、能否预览和下载，都由你决定。'}</p></div></div>
           {!isNote && <div className="share-choice-grid"><label className="share-check"><input type="checkbox" checked={requireLogin} onChange={(event) => setRequireLogin(event.target.checked)} data-agent-id="shares.editor.requireLogin" /><span><b>需要登录</b><small>访客登录后才能打开</small></span></label><label className="share-check"><input type="checkbox" checked={allowPreview} onChange={(event) => setAllowPreview(event.target.checked)} data-agent-id="shares.editor.allowPreview" /><span><b>允许在线预览</b><small>可在页面查看支持的媒体</small></span></label><label className="share-check"><input type="checkbox" checked={allowDownload} onChange={(event) => setAllowDownload(event.target.checked)} data-agent-id="shares.editor.allowDownload" /><span><b>允许下载</b><small>为访客签发短时下载链接</small></span></label></div>}
           <div className="share-fields"><label>提取码（{selected?.hasPassword ? '留空保持原提取码' : '留空则无需提取码'}）<Input.Password value={password} onChange={setPassword} minLength={4} maxLength={128} visibilityToggle={false} placeholder="4–128 位，可选" data-agent-id="shares.editor.password" data-agent-ignore="true" autoComplete="new-password" /></label>{selected?.hasPassword && <label className="share-check"><input type="checkbox" checked={removePassword} onChange={(event) => setRemovePassword(event.target.checked)} data-agent-id="shares.editor.removePassword" />移除原提取码</label>}</div>
-          <div className="share-fields share-limit"><label className="share-check"><input type="checkbox" checked={neverExpires} onChange={(event) => setNeverExpires(event.target.checked)} data-agent-id="shares.editor.neverExpires" />永不过期</label>{!neverExpires && <label>到期时间（本地时间）<input type="datetime-local" value={expires} onChange={(event) => setExpires(event.target.value)} data-agent-id="shares.editor.expiresAt" required /></label>}{!isNote && <label className="share-check"><input type="checkbox" checked={unlimited} onChange={(event) => setUnlimited(event.target.checked)} data-agent-id="shares.editor.unlimited" />不限下载链接签发次数</label>}{!isNote && !unlimited && <label>最多签发次数<input type="number" min={Math.max(1, selected?.downloadCount ?? 1)} max={1000000} value={maxDownloads} onChange={(event) => setMaxDownloads(event.target.value)} data-agent-id="shares.editor.maxDownloads" required /></label>}</div><p className="share-hint">{isNote ? '笔记分享只读且允许复制，提取码和到期时间由公开访问接口校验；请勿在链接或二维码中附带提取码。' : '下载次数按签发短时链接计数；同一链接有效期内可被重复使用。已展示在浏览器中的预览内容无法禁止保存。'}</p>
+          <div className="share-fields share-limit"><label className="share-check"><input type="checkbox" checked={neverExpires} onChange={(event) => setNeverExpires(event.target.checked)} data-agent-id="shares.editor.neverExpires" />永不过期</label>{!neverExpires && <label>到期时间（本地时间）<input type="datetime-local" value={expires} onChange={(event) => setExpires(event.target.value)} data-agent-id="shares.editor.expiresAt" required /></label>}{!isNote && <label className="share-check"><input type="checkbox" checked={unlimited} onChange={(event) => setUnlimited(event.target.checked)} data-agent-id="shares.editor.unlimited" />不限下载链接签发次数</label>}{!isNote && !unlimited && <label>最多签发次数<input type="number" min={Math.max(1, selected?.downloadCount ?? 1)} max={1000000} value={maxDownloads} onChange={(event) => setMaxDownloads(event.target.value)} data-agent-id="shares.editor.maxDownloads" required /></label>}{isNote && <label className="share-check"><input type="checkbox" checked={unlimitedViews} onChange={(event) => setUnlimitedViews(event.target.checked)} data-agent-id="shares.editor.unlimitedViews" />不限笔记阅读次数</label>}{isNote && !unlimitedViews && <label>最多阅读次数<input type="number" min={Math.max(1, selected?.viewCount ?? 1)} max={1000000} value={maxViews} onChange={(event) => setMaxViews(event.target.value)} data-agent-id="shares.editor.maxViews" required /></label>}</div><p className="share-hint">{isNote ? '笔记按成功读取正文的次数计数（刷新或重复打开均计次），达到上限后不能再读取；提取码和到期时间另行生效。二维码不含提取码。' : '下载次数按签发短时链接计数；同一链接有效期内可被重复使用。已展示在浏览器中的预览内容无法禁止保存。'}</p>
         </section>
         </div>
-        <aside className="share-editor-aside" aria-label="分享设置概要" data-agent-region="shares.editorSummary"><div className="share-summary-card"><small>页面预览 · {isNote ? '笔记只读' : mode === 'activity' ? '活动展示' : '文件分享'}</small><div className="share-summary-visual" aria-hidden="true">{isNote ? '✎' : mode === 'activity' ? '✦' : '▤'}</div><h2>{title.trim() || '你的分享标题'}</h2><p>{description.trim() || (isNote ? '打开链接，阅读你公开分享的文字。' : mode === 'activity' ? '用照片与故事呈现旅途的精彩。' : '打开链接，就能浏览你分享的文件。')}</p><div className="share-summary-tags"><span>{requireLogin ? '需要登录' : '链接可访问'}</span><span>{password || selected?.hasPassword && !removePassword ? '需要提取码' : '无需提取码'}</span><span>{isNote ? '只读文字' : allowDownload ? '允许下载' : '仅供预览'}</span></div></div><div className="share-summary-help"><b>链接将会显示为</b><p>share.convenience.top/{user?.publicHandle ?? '用户名'}/{slug.trim().toLowerCase() || '自动生成路径'}</p><small>仅作为设置预览，保存后才能访问。</small></div></aside>
+        <aside className="share-editor-aside" aria-label="分享设置概要" data-agent-region="shares.editorSummary"><div className="share-summary-card"><small>页面预览 · {isNote ? '笔记只读' : mode === 'activity' ? '活动展示' : '文件分享'}</small><div className="share-summary-visual" aria-hidden="true">{isNote ? '✎' : mode === 'activity' ? '✦' : '▤'}</div><h2>{title.trim() || '你的分享标题'}</h2><p>{description.trim() || (isNote ? '打开链接，阅读你公开分享的文字。' : mode === 'activity' ? '用照片与故事呈现旅途的精彩。' : '打开链接，就能浏览你分享的文件。')}</p><div className="share-summary-tags"><span>{requireLogin ? '需要登录' : '链接可访问'}</span><span>{password || selected?.hasPassword && !removePassword ? '需要提取码' : '无需提取码'}</span><span>{isNote ? unlimitedViews ? '阅读不限次' : `最多阅读 ${maxViews || '待设置'} 次` : allowDownload ? '允许下载' : '仅供预览'}</span></div></div><div className="share-summary-help"><b>链接将会显示为</b><p>share.convenience.top/{user?.publicHandle ?? '用户名'}/{slug.trim().toLowerCase() || '自动生成路径'}</p><small>仅作为设置预览，保存后才能访问。</small></div></aside>
         <div className="share-submit"><span>所有变更需要保存后才会生效。</span><div><Link to={editorBack} data-agent-id="shares.editor.cancel">取消</Link><Button type="primary" htmlType="submit" size="large" loading={busy} disabled={busy || !user?.publicHandle} data-agent-id="shares.editor.submit">{editing ? '保存设置' : '创建分享'}</Button></div></div>
         {!user?.publicHandle && <p className="share-setup-required"><Link to="/settings/account" state={navigationSource(pageLocation.pathname, pageLocation.search, pageLocation.state)} data-agent-id="shares.editor.setupHandle">请先设置公开用户名 →</Link></p>}
       </form>}
@@ -237,9 +253,10 @@ export default function SharesPage() {
     </div>
     <Modal visible={Boolean(qrShare)} footer={null} closable={false} onCancel={() => setQrShare(null)} title="分享二维码" data-agent-region="shares.qr" className="share-qr-modal">
       <p>扫码访问「{qrShare?.title}」。二维码只包含公开分享链接，不包含提取码或正文；分享过期或取消后链接将不可访问。</p>
+      {qrShare?.targetType === 'note' && qrShare.maxViews !== null && <p role="status">笔记已阅读 {qrShare.viewCount} / {qrShare.maxViews} 次。{qrShare.viewCount >= qrShare.maxViews ? '已达上限，扫码后无法再读取正文；可到分享设置调整。' : '每次成功读取正文（含刷新）都会占用一次额度。'}</p>}
       {qrBusy ? <p role="status">正在生成二维码…</p> : qrImage && <img src={qrImage} alt="公开分享链接二维码" />}
       {qrShare && user?.publicHandle && <p className="share-qr-url">{shareLink(user.publicHandle, qrShare.slug)}</p>}
-      <div className="share-qr-actions"><Button htmlType="button" disabled={!qrImage} data-agent-id="shares.qr.download" onClick={downloadQr}>下载二维码</Button><Button htmlType="button" type="primary" data-agent-id="shares.qr.close" onClick={() => setQrShare(null)}>完成</Button></div>
+      <div className="share-qr-actions"><Button htmlType="button" disabled={!qrImage} data-agent-id="shares.qr.copy" onClick={() => void copyQr()}>复制二维码</Button><Button htmlType="button" disabled={!qrImage} data-agent-id="shares.qr.download" onClick={downloadQr}>下载 PNG</Button><Button htmlType="button" type="primary" data-agent-id="shares.qr.close" onClick={() => setQrShare(null)}>完成</Button></div>
     </Modal>
   </div>;
 }

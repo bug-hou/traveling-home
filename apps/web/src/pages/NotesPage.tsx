@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useBlocker } from 'react-router-dom';
 import { Button, Input, Modal } from '@arco-design/web-react';
 import QRCode from 'qrcode';
 import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
@@ -31,6 +31,13 @@ export default function NotesPage() {
   const [total, setTotal] = useState(0);
   const [moreBusy, setMoreBusy] = useState(false);
   const dirty = selected ? selected.title !== title || selected.content !== content : Boolean(title || content);
+  const blocker = useBlocker(dirty);
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    if (window.confirm('当前笔记尚未保存，确定离开并放弃修改吗？')) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
 
   useEffect(() => {
     let active = true;
@@ -156,7 +163,7 @@ export default function NotesPage() {
     <aside className="share-sidebar" data-agent-region="notes.sidebar"><Link to="/" className="share-brand" data-agent-id="nav.home.brand"><img src={`${import.meta.env.BASE_URL}brand-mark.svg`} alt="" /><strong>迹光</strong><span>个人空间</span></Link><span className="share-sidebar-caption">我的空间</span><WorkspaceNavigation /><div className="share-sidebar-note"><b>给文字一个去处</b><p>记录临时想法或旅途札记，随时在手机上安全取回。</p></div></aside>
     <div className="share-main"><header className="share-top" data-agent-region="notes.header"><span>工作空间 / <b>随手记</b></span><nav><Link to="/shares" data-agent-id="notes.header.shares">我的分享</Link><Link to="/settings/account" className="share-header-avatar" aria-label="账号设置" data-agent-id="notes.header.account">{(user?.nickname || '旅').slice(0, 1)}</Link></nav></header>
       <main className="share-container"><div className="share-heading"><div><small>NOTES / 迹光云空间</small><h1>随手记</h1><p>写好后点击保存，随后可以从手机取回或公开分享。</p></div></div>
-        <div className="notes-layout"><section className="notes-list" data-agent-region="notes.list"><div className="notes-list-heading"><h2>我的笔记 <span>{total}</span></h2><Button htmlType="button" type="primary" data-agent-id="notes.list.create" onClick={() => void selectNote(null)}>＋ 新建</Button></div><Input.Search value={query} onChange={setQuery} placeholder="搜索已加载笔记标题" aria-label="搜索已加载笔记标题" data-agent-id="notes.list.search" allowClear />
+        <div className="notes-layout"><section className="notes-list" data-agent-region="notes.list"><div className="notes-list-heading"><h2>我的笔记 <span>{total}</span></h2><Button htmlType="button" type="primary" data-agent-id="notes.list.create" onClick={() => void selectNote(null)}>＋ 新建</Button></div><Input.Search value={query} onChange={setQuery} placeholder="搜索已加载笔记标题" aria-label="搜索已加载笔记标题" data-agent-id="notes.list.search" />
           {loading ? <p role="status">正在读取笔记…</p> : total === 0 ? <div className="notes-empty">还没有笔记，在右侧写下第一句吧。</div> : <div className="notes-list-items">{notes.filter((note) => note.title.toLowerCase().includes(query.trim().toLowerCase())).map((note) => <button key={note.id} type="button" disabled={detailLoading || busy} className={note.id === selected?.id ? 'is-selected' : ''} aria-pressed={note.id === selected?.id} onClick={() => void selectNote(note)} data-agent-id={`notes.row.${note.id}.open`}><strong>{note.title}</strong><span>纯文本笔记 · 点击读取</span><small>{new Date(note.updatedAt).toLocaleString('zh-CN')}</small></button>)}</div>}{notes.length < total && <Button htmlType="button" loading={moreBusy} onClick={() => void loadMore()} data-agent-id="notes.list.more">加载更多</Button>}</section>
           <section className="notes-editor" data-agent-region="notes.editor"><div className="notes-editor-head"><span>{selected ? '编辑笔记' : '新笔记'}</span><span>{detailLoading ? '正在加载正文…' : busy ? '正在保存…' : dirty ? '未保存，离开会丢失修改' : selected ? '已保存' : '尚未创建'}</span></div><form onSubmit={(event) => void save(event)}><label htmlFor="note-title">标题</label><Input id="note-title" value={title} maxLength={80} disabled={detailLoading || busy} onChange={setTitle} placeholder="给这段文字一个标题" data-agent-id="notes.editor.title" required /><label htmlFor="note-content">内容</label><Input.TextArea id="note-content" value={content} maxLength={10000} disabled={detailLoading || busy} onChange={setContent} data-agent-ignore="true" placeholder="在这里写下你想保存的文字…" data-agent-id="notes.editor.content" rows={12} required /><small>{content.length} / 10000 字</small><div className="notes-editor-actions"><Button type="primary" htmlType="submit" loading={busy} disabled={busy || detailLoading || !title.trim() || !content.trim() || !dirty} data-agent-id="notes.editor.save">{selected ? '保存修改' : '保存笔记'}</Button>{selected && <><Button htmlType="button" disabled={busy || pairBusy || dirty} onClick={() => void startPair()} data-agent-id="notes.editor.pair">手机扫码取回</Button><Link className="notes-share-link" to={`/shares/new?targetId=${encodeURIComponent(selected.id)}&targetType=note`} data-agent-id="notes.editor.share" onClick={(event) => { if (dirty) { event.preventDefault(); setError('请先保存笔记再创建分享'); } }}>创建公开分享</Link><Button htmlType="button" status="danger" disabled={busy} onClick={() => void remove()} data-agent-id="notes.editor.delete" data-agent-danger="true">删除</Button></>}</div></form></section></div>
         {error && <p role="alert" className="share-alert">{error}</p>}{notice && <p role="status" className="share-success">{notice}</p>}
