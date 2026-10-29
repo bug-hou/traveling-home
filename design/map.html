@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>足迹地图 · 迹光设计稿</title>
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/map.css" />
+</head>
+<body>
+  <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 10h18"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15m6-12v15"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5 5 19"/></symbol>
+    <symbol id="i-photo" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.5"/><path d="m4 17 5-5 3 3 3-3 5 5"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+  </svg>
+  <div class="shell">
+    <aside class="sidebar" aria-label="主导航">
+      <a class="brand" href="home.html"><img src="assets/logo.svg" alt="" /><span>迹光</span></a>
+      <p class="side-caption">工作空间</p>
+      <nav class="side-nav">
+        <a class="nav-item" href="home.html"><svg><use href="#i-home"/></svg><span>首页</span></a>
+        <a class="nav-item" href="files.html"><svg><use href="#i-folder"/></svg><span>全部文件</span></a>
+        <a class="nav-item is-active" href="map.html" aria-current="page"><svg><use href="#i-map"/></svg><span>足迹地图</span></a>
+        <span class="nav-item is-disabled"><svg><use href="#i-calendar"/></svg><span>旅行 · 准备中</span></span>
+      </nav>
+      <div class="sidebar-bottom"><div class="private-card"><svg><use href="#i-shield"/></svg><span><strong>只属于你的足迹</strong><small>此处展示个人素材的设计示例</small></span></div><div class="profile"><span class="avatar">旅</span><span><strong>个人空间</strong><small>设计稿预览</small></span></div></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar"><div class="topbar-path"><span>WORKSPACE</span><b>/</b><strong>足迹地图</strong></div><div class="topbar-right"><span class="private-note"><svg><use href="#i-shield"/></svg> 仅本人可见</span><span class="top-avatar" aria-hidden="true">旅</span></div></header>
+      <div class="map-page">
+        <div class="page-intro"><div><p class="eyebrow">YOUR PLACES <span>/</span> 01</p><h1>走过的地方，<br class="mobile-break" />都有迹可循<span class="title-period">.</span></h1><p class="intro-copy">把有位置的照片与视频，轻轻放回地图上。点开一枚足迹，再回到那一帧。</p></div><a class="intro-link" href="upload.html"><svg><use href="#i-upload"/></svg> 上传新的旅途素材</a></div>
+        <div class="stats" aria-label="足迹概览"><div class="stat"><span class="stat-icon"><svg><use href="#i-pin"/></svg></span><div><small>地图上的素材</small><strong id="located-count">04 <span>份</span></strong></div></div><div class="stat"><span class="stat-icon stat-icon--muted"><svg><use href="#i-photo"/></svg></span><div><small>等待标记位置</small><strong id="unlocated-count">02 <span>份</span></strong></div></div><div class="stat stat-next"><span class="stat-icon stat-icon--subtle"><svg><use href="#i-map"/></svg></span><div><small>县级点亮</small><strong>下一步 <span>再见面 ↗</span></strong></div></div></div>
+        <section class="workspace" aria-labelledby="workspace-title">
+          <div class="workspace-head"><div><span class="section-kicker">THE MAP / 你的旅行坐标</span><h2 id="workspace-title">我的足迹</h2></div><span class="view-label"><span></span> 私人空间 · 示例视图</span></div>
+          <div class="workspace-body">
+            <div class="map-column">
+              <div class="map-canvas" aria-label="地图布局示意，点位不按真实经纬度投影">
+                <svg class="map-art" viewBox="0 0 800 620" preserveAspectRatio="xMidYMid slice" role="img" aria-label="抽象山川与道路插画，非真实地图或行政边界">
+                  <defs><pattern id="map-grid" width="50" height="50" patternUnits="userSpaceOnUse"><path d="M50 0H0V50" fill="none" stroke="#dce5dc" stroke-width=".75"/></pattern></defs>
+                  <rect width="800" height="620" fill="url(#map-grid)"/>
+                  <path class="land land-one" d="M-100 135C40 60 78 25 207 40s203 102 330 40S771 34 916 131v575H-100z"/>
+                  <path class="land land-two" d="M-35 541C50 391 151 443 231 320S377 222 500 278s188 6 333-92l60 447-928-8z"/>
+                  <path class="land land-three" d="M-65 622c140-154 198-111 286-166s201-123 293-50 219-20 348-76v340z"/>
+                  <path class="river" d="M-30 433C100 382 80 300 206 301s137 117 274 67 195-161 370-178"/>
+                  <path class="road" d="M-44 168C120 204 127 380 273 323S438 200 528 252 681 403 841 312"/>
+                  <path class="road road-secondary" d="M134-28c13 113 96 119 117 218s-45 177 39 249 166 68 180 219M700-39c-66 128-7 232-103 310s-160 185-169 393"/>
+                  <path class="contour" d="M-14 143C55 66 137 69 160 129s-5 79 65 118 99 9 152 62M486 66c91-44 123-8 132 44s76 47 107 2M37 564c90-131 164-79 212-127s105-99 161-74M470 500c130-45 188 42 325-20"/>
+                  <path class="contour" d="M-13 160C56 83 126 89 143 146s3 90 70 120 115 2 158 48M503 83c79-33 101-10 113 45s78 43 96 6M67 581c85-116 143-80 203-132s98-88 146-65M474 523c125-37 179 42 321-20"/>
+                  <path class="contour" d="M14 178c55-66 112-70 124-16s14 92 75 124 109 13 144 41M531 104c54-25 70-14 80 45s73 40 86 9M96 598c90-104 133-65 194-130s79-81 138-64M488 543c108-24 166 44 308-18"/>
+                  <text x="121" y="115" class="terrain-text">山野</text><text x="540" y="146" class="terrain-text">林间</text><text x="108" y="499" class="terrain-text">旅途</text>
+                </svg>
+                <div class="map-overlay-top"><span class="map-small-title">PLACES YOU'VE BEEN</span><span class="map-illustration-tag">底图示意 · 非真实点位投影</span></div>
+                <div id="map-markers" class="map-markers"></div>
+                <div id="map-message" class="map-message" hidden></div>
+                <div class="map-overlay-bottom"><span class="map-legend"><i></i> 已定位素材</span><span>01 / 先看素材点位</span></div>
+              </div>
+              <p class="map-hint"><svg><use href="#i-shield"/></svg> 原型仅使用手绘示意背景；正式版才会接入合规底图与本人真实坐标，县界和点亮本期不展示。</p>
+            </div>
+            <aside class="media-pane" aria-labelledby="pane-title">
+              <div class="pane-tabs" role="group" aria-label="素材定位状态"><button type="button" data-tab="located" class="is-active" aria-pressed="true">已定位 <span id="tab-located-count">04</span></button><button type="button" data-tab="unlocated" aria-pressed="false">未定位 <span id="tab-unlocated-count">02</span></button></div>
+              <div class="pane-content"><div class="pane-intro"><span id="pane-label">已定位的照片与视频</span><span id="pane-total">4 份素材</span></div><div id="media-list" class="media-list"></div><div id="media-detail" class="media-detail" hidden><div id="detail-art" class="detail-art"><span id="detail-kind" class="art-kind"></span><span class="art-sun"></span><span class="art-mountain art-mountain--back"></span><span class="art-mountain art-mountain--front"></span></div><div class="detail-copy"><span class="detail-eyebrow">SELECTED MOMENT <span>·</span> 示例</span><h3 id="detail-name"></h3><p id="detail-location"></p><small id="detail-source"></small></div><button id="open-preview" type="button" class="detail-button">点回素材预览 <svg><use href="#i-arrow"/></svg></button></div><div id="pane-foot" class="pane-foot">选择地图上的点位，查看属于那里的素材。</div></div>
+            </aside>
+          </div>
+        </section>
+        <div class="below-workspace"><div class="unlocated-note"><span class="note-mark"><svg><use href="#i-pin"/></svg></span><div><strong>有些回忆，还没有坐标。</strong><p>没有 GPS 的素材不会出现在地图上，也不会猜测地点。你可以在素材预览里手动补充位置。</p></div><button id="show-unlocated" type="button">查看未定位素材 <svg><use href="#i-arrow"/></svg></button></div><div class="next-note"><span>COMING NEXT / 县级点亮</span><p>县界数据与坐标转换核实后，再让走过的县区逐一亮起来。本版不显示省、市、县数量。</p></div></div>
+        <footer class="page-footer"><span>迹光 · 为走过的每一程留个位置</span><span>独立交互原型 · 文件、位置、数量均为示例，不访问账号或 API</span></footer>
+      </div>
+    </main>
+  </div>
+  <nav class="mobile-nav" aria-label="移动端导航"><a href="home.html"><svg><use href="#i-home"/></svg>首页</a><a href="files.html"><svg><use href="#i-folder"/></svg>文件</a><a class="is-active" href="map.html" aria-current="page"><svg><use href="#i-map"/></svg>足迹</a><span><svg><use href="#i-calendar"/></svg>旅行</span><span><svg><use href="#i-user"/></svg>我的</span></nav>
+  <div class="prototype-tools" role="group" aria-label="原型状态切换"><span>原型状态</span><button type="button" data-mode="sample" class="is-active" aria-pressed="true">示例</button><button type="button" data-mode="empty" aria-pressed="false">无足迹</button><button type="button" data-mode="error" aria-pressed="false">加载失败</button></div>
+  <div id="preview-dialog" class="dialog-backdrop" hidden><div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><button type="button" id="close-preview" class="dialog-close" aria-label="关闭素材预览"><svg><use href="#i-close"/></svg></button><div id="dialog-art" class="dialog-art"><span class="art-sun"></span><span class="art-mountain art-mountain--back"></span><span class="art-mountain art-mountain--front"></span></div><span class="dialog-eyebrow">MOMENT / 示例素材预览</span><h2 id="dialog-title"></h2><p id="dialog-location"></p><p class="dialog-disclaimer">此处只演示从地图点位回到素材；正式版按素材 ID 打开私有预览，不在地图上公开文件。</p><a id="dialog-link" href="preview.html?demo=located">查看完整预览设计稿 <svg><use href="#i-arrow"/></svg></a></div></div>
+  <script src="assets/map.js"></script>
+</body>
+</html>

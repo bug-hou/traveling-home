@@ -34,7 +34,7 @@
       <nav class="side-nav">
         <a class="nav-item" href="home.html"><svg><use href="#i-home"/></svg><span>首页</span></a>
         <a class="nav-item is-active" href="files.html" aria-current="page" data-drop-folder="root"><svg><use href="#i-folder"/></svg><span>全部文件</span></a>
-        <button class="nav-item" data-unavailable="足迹地图" type="button"><svg><use href="#i-map"/></svg><span>足迹地图</span></button>
+        <a class="nav-item" href="map.html"><svg><use href="#i-map"/></svg><span>足迹地图</span></a>
         <button class="nav-item" data-unavailable="旅行" type="button"><svg><use href="#i-calendar"/></svg><span>旅行</span></button>
         <button class="nav-item" data-unavailable="回收站页面" type="button"><svg><use href="#i-trash"/></svg><span>回收站</span></button>
       </nav>
@@ -60,7 +60,7 @@
       </div>
     </main>
   </div>
-  <nav class="mobile-nav" aria-label="移动端导航"><a href="home.html"><svg><use href="#i-home"/></svg><span>首页</span></a><a class="is-active" href="files.html" aria-current="page"><svg><use href="#i-folder"/></svg><span>文件</span></a><button data-unavailable="足迹地图" type="button"><svg><use href="#i-map"/></svg><span>足迹</span></button><button data-unavailable="旅行" type="button"><svg><use href="#i-calendar"/></svg><span>旅行</span></button><button data-unavailable="个人空间" type="button"><svg><use href="#i-user"/></svg><span>我的</span></button></nav>
+  <nav class="mobile-nav" aria-label="移动端导航"><a href="home.html"><svg><use href="#i-home"/></svg><span>首页</span></a><a class="is-active" href="files.html" aria-current="page"><svg><use href="#i-folder"/></svg><span>文件</span></a><a href="map.html"><svg><use href="#i-map"/></svg><span>足迹</span></a><button data-unavailable="旅行" type="button"><svg><use href="#i-calendar"/></svg><span>旅行</span></button><button data-unavailable="个人空间" type="button"><svg><use href="#i-user"/></svg><span>我的</span></button></nav>
   <div class="preview-tools" aria-label="设计稿预览工具"><span>预览状态</span><button class="is-active" type="button" data-preview="sample">示例文件</button><button type="button" data-preview="empty">新账号空状态</button><button id="reset-sample" type="button">重置示例</button></div>
   <div id="modal" class="modal-backdrop" hidden><div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-head"><div><span class="modal-kicker">文件整理 · 原型预览</span><h2 id="modal-title"></h2></div><button id="modal-close" class="icon-button" type="button" aria-label="关闭对话框"><svg><use href="#i-close"/></svg></button></div><div id="modal-content" class="modal-content"></div><div id="modal-actions" class="modal-actions"></div></div></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

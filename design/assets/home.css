@@ -174,8 +174,7 @@ a, button { -webkit-tap-highlight-color: transparent; }
 .map-preview::before { opacity: .1; }
 .china-map { top: 0; left: 8%; width: 76%; height: 230px; }
 .county-lines path { fill: #e9eee7; stroke: #c9d6c9; }
-.lit-polygons path { fill: #8db29a; stroke: #f6f8f4; }
-.flight-path { stroke: #9b9f80; }
+.county-lines path:not(:first-child), .lit-polygons, .flight-path { display: none; }
 .map-points circle { stroke: #6e9e7c; }
 .map-points circle:last-child { fill: #5b8e72; }
 .map-glow { fill: #749c7822; stroke: #648e72; }
