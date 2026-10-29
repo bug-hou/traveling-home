@@ -353,3 +353,21 @@
 @media(max-width:980px) and (min-width:701px){.upload-sidebar .workspace-nav{margin-top:37px}}
 .upload-mobile-nav a{align-content:center}
 .upload-mobile-nav a[aria-current=page]{color:#326a51}
+
+.phone-pair-card { margin-bottom: 18px; padding: 18px; border: 1px solid var(--j-line); border-radius: 9px; background: #fff; }
+.phone-pair-heading { display: flex; align-items: center; gap: 12px; }
+.phone-pair-mark { display: grid; width: 40px; height: 40px; flex-shrink: 0; place-items: center; border-radius: 7px; background: #e8f0e9; color: #4b806d; font-size: 22px; }
+.phone-pair-heading h2 { margin: 0 0 3px; font-size: 15px; }
+.phone-pair-heading p, .phone-pair-detail p, .phone-pair-actions p { margin: 0; color: #788b80; font-size: 12px; line-height: 1.6; }
+.phone-pair-actions { margin: 14px 0 0 52px; }
+.phone-pair-actions p { margin-bottom: 10px; }
+.phone-pair-body { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; margin-top: 15px; }
+.phone-pair-qr { width: 168px; height: 168px; border: 1px solid var(--j-line); border-radius: 7px; }
+.phone-pair-detail { display: grid; justify-items: start; gap: 11px; }
+.phone-pair-detail b, .phone-pair-detail a { color: #326a51; font-size: 13px; }
+.phone-pair-code { padding: 8px 12px; border-radius: 7px; background: #e8f0e9; color: #326a51; font-size: 24px; letter-spacing: .15em; }
+.phone-pair-card .arco-btn { min-height: 36px; border-radius: 7px; }
+.phone-pair-error { margin: 12px 0 0; color: #b25952; font-size: 12px; }
+.phone-pair-files { width: min(330px, 100%); display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.phone-pair-files li { overflow: hidden; padding: 5px 8px; border: 1px solid var(--j-line); border-radius: 6px; color: #4c6153; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 700px) { .phone-pair-card { padding: 14px; } .phone-pair-actions { margin-left: 0; } .phone-pair-qr { width: 145px; height: 145px; } }

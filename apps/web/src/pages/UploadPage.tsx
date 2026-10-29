@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import { Link, useBlocker, useBeforeUnload, useLocation, useSearchParams } from 'react-router-dom';
 import { WorkspaceMobileNavigation, WorkspaceNavigation } from '@/components/WorkspaceNavigation';
+import PhonePairPanel from '@/components/PhonePairPanel';
 import { navigationSource, returnLabel, returnTarget } from '@/services/navigation';
 import { Button, Modal, Progress } from '@arco-design/web-react';
 import { IconRefresh } from '@arco-design/web-react/icon';
@@ -117,6 +118,8 @@ export default function UploadPage() {
   const [items, setItems] = useState<UploadItem[]>([]);
   const itemsRef = useRef(items);
   const [destination, setDestination] = useState<DirectoryEntry>({ id: null, name: '全部文件' });
+  const [phonePairActive, setPhonePairActive] = useState(false);
+  const [destinationReady, setDestinationReady] = useState(!initialParentId || !/^[a-f\d]{24}$/i.test(initialParentId));
   const [directoryOpen, setDirectoryOpen] = useState(false);
   const [directoryStack, setDirectoryStack] = useState<DirectoryEntry[]>([{ id: null, name: '全部文件' }]);
   const [folders, setFolders] = useState<NodeSummary[]>([]);
@@ -182,9 +185,11 @@ export default function UploadPage() {
   useEffect(() => {
     if (!initialParentId || !/^[a-f\d]{24}$/i.test(initialParentId)) return;
     let active = true;
+    setDestinationReady(false);
     nodesApi.detail(initialParentId).then(({ node }) => {
       if (active && node.type === 'folder') setDestination({ id: node.id, name: node.name });
-    }).catch(() => { if (active) notify('目标文件夹不可用，请重新选择目录'); });
+    }).catch(() => { if (active) notify('目标文件夹不可用，请重新选择目录'); })
+      .finally(() => { if (active) setDestinationReady(true); });
     return () => { active = false; };
   }, [initialParentId]);
 
@@ -504,10 +509,12 @@ export default function UploadPage() {
 
           <section className="upload-destination" data-agent-region="upload.destination">
             <div className="upload-destination-copy"><span className="upload-destination-icon" aria-hidden="true">▤</span><span><small>上传到</small><b>{destination.name}</b></span></div>
-            <button ref={directoryToggleRef} className="upload-destination-button" type="button" aria-expanded={directoryOpen} disabled={queueRunning} aria-disabled={queueRunning} data-agent-id="upload.destination.open" onClick={openDirectoryPicker}>
+            <button ref={directoryToggleRef} className="upload-destination-button" type="button" aria-expanded={directoryOpen} disabled={queueRunning || phonePairActive} aria-disabled={queueRunning || phonePairActive} data-agent-id="upload.destination.open" onClick={openDirectoryPicker}>
               更改目录 <span aria-hidden="true">⌄</span>
             </button>
           </section>
+
+          {destinationReady ? <PhonePairPanel parentId={destination.id} folderName={destination.name} onActiveChange={setPhonePairActive} /> : <p role="status">正在确认手机上传目标目录…</p>}
 
           <section
             className={`upload-dropzone${dragging ? ' is-dragging' : ''}`}

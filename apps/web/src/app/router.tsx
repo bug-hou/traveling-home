@@ -11,6 +11,7 @@ const FilesPage = lazy(() => import('@/pages/FilesPage'));
 const PreviewPage = lazy(() => import('@/pages/PreviewPage'));
 const SharesPage = lazy(() => import('@/pages/SharesPage'));
 const PublicSharePage = lazy(() => import('@/pages/PublicSharePage'));
+const PhoneUploadPage = lazy(() => import('@/pages/PhoneUploadPage'));
 
 function GuestOnly() {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
           { path: '/register', element: <AuthPage />, handle: { agent: { pageId: 'register' } } },
         ],
       },
+      { path: 'phone-upload/:id', element: <Suspense fallback={<main className="auth-loading">正在连接手机…</main>}><PhoneUploadPage /></Suspense>, handle: { agent: { pageId: 'phoneUpload' } } },
       { path: 's/:handle/:slug', element: <Suspense fallback={<main className="auth-loading">正在打开分享…</main>}><PublicSharePage /></Suspense>, handle: { agent: { pageId: 'publicShare' } } },
       { path: ':handle/:slug', element: <Suspense fallback={<main className="auth-loading">正在打开分享…</main>}><PublicSharePage /></Suspense>, handle: { agent: { pageId: 'publicShare' } } },
       {

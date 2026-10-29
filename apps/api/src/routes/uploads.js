@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { fail, parseBody } from '../lib/http.js';
+import { getPhonePairing } from './phone-uploads.js';
 
 const MAX_OBJECT_SIZE = 5_000_000_000_000;
 const UPLOAD_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -26,6 +27,9 @@ const credentialsBody = z
     parentId: parentIdSchema.nullable().optional(),
   })
   .strict();
+const phoneCredentialsBody = credentialsBody.omit({ parentId: true });
+const PHONE_MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+const PHONE_MAX_FILES = 100;
 const automaticLocationSchema = z.object({
   latitude: z.number().finite().min(-90).max(90),
   longitude: z.number().finite().min(-180).max(180),
@@ -94,16 +98,21 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
   const nodes = db.collection('nodes');
   const sessions = db.collection('upload_sessions');
 
-  app.post('/uploads/credentials', { preHandler: requireAuth }, async (req, reply) => {
+  const pairs = db.collection('phone_upload_pairs');
+
+  async function createCredentials(req, reply, pair = null) {
     if (!cfg.cos || !cos) {
       return fail(reply, 503, 'UPLOADS_NOT_CONFIGURED', '上传服务暂不可用');
     }
 
-    const body = parseBody(credentialsBody, req.body, reply);
+    const body = parseBody(pair ? phoneCredentialsBody : credentialsBody, req.body, reply);
     if (!body) return;
+    if (pair && body.size > PHONE_MAX_FILE_SIZE) {
+      return fail(reply, 400, 'PHONE_FILE_TOO_LARGE', '扫码上传单个文件不能超过 5 GB');
+    }
 
-    const userId = req.user._id;
-    const parentId = body.parentId ? new ObjectId(body.parentId) : null;
+    const userId = pair ? pair.userId : req.user._id;
+    const parentId = pair ? pair.parentId : body.parentId ? new ObjectId(body.parentId) : null;
     if (!(await findActiveParent(nodes, userId, parentId))) {
       return fail(reply, 404, 'PARENT_NOT_FOUND', '目标文件夹不存在');
     }
@@ -128,18 +137,33 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       createdAt: now,
       expiresAt,
       credentialExpiresAt,
+      ...(pair ? { phonePairId: pair._id } : {}),
     };
+
+    if (pair) {
+      const reserved = await pairs.updateOne(
+        { _id: pair._id, status: 'approved', approvedUntil: { $gt: now }, issuedCount: { $lt: PHONE_MAX_FILES } },
+        { $inc: { issuedCount: 1 } },
+      );
+      if (!reserved.matchedCount) return fail(reply, 410, 'PAIRING_LIMIT', '本次扫码上传已结束或达到 100 个文件的上限');
+    }
 
     let authorization;
     try {
       authorization = await cos.issueUploadCredentials({ key });
     } catch {
+      if (pair) await pairs.updateOne({ _id: pair._id }, { $inc: { issuedCount: -1 } });
       return fail(reply, 503, 'UPLOAD_AUTH_UNAVAILABLE', '暂时无法创建上传授权，请稍后重试');
     }
 
     try {
+      if (pair && !(await pairs.findOne({ _id: pair._id, status: 'approved', approvedUntil: { $gt: new Date() } }))) {
+        await pairs.updateOne({ _id: pair._id }, { $inc: { issuedCount: -1 } });
+        return fail(reply, 410, 'PAIRING_INACTIVE', '电脑已结束本次扫码上传');
+      }
       await sessions.insertOne(session);
     } catch {
+      if (pair) await pairs.updateOne({ _id: pair._id }, { $inc: { issuedCount: -1 } });
       return fail(reply, 503, 'UPLOAD_SESSION_UNAVAILABLE', '暂时无法创建上传任务，请稍后重试');
     }
 
@@ -153,15 +177,22 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       credentials: authorization.credentials,
       expiresAt: authorization.expiresAt,
     });
+  }
+
+  app.post('/uploads/credentials', { preHandler: requireAuth }, (req, reply) => createCredentials(req, reply));
+  app.post('/phone-uploads/:id/credentials', async (req, reply) => {
+    const pair = await getPhonePairing(req, reply, db, { forCredentials: true });
+    if (!pair) return;
+    return createCredentials(req, reply, pair);
   });
 
-  app.post('/uploads/complete', { preHandler: requireAuth }, async (req, reply) => {
+  async function completeUpload(req, reply, pair = null) {
     const body = parseBody(completeBody, req.body, reply);
     if (!body) return;
 
-    const userId = req.user._id;
+    const userId = pair ? pair.userId : req.user._id;
     const uploadId = new ObjectId(body.uploadId);
-    const session = await sessions.findOne({ _id: uploadId, userId });
+    const session = await sessions.findOne({ _id: uploadId, userId, ...(pair ? { phonePairId: pair._id } : {}) });
     if (!session) return fail(reply, 404, 'UPLOAD_SESSION_NOT_FOUND', '上传任务不存在或已过期');
     if (body.location) {
       const { name, mime } = session;
@@ -208,6 +239,9 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     if (!(await findActiveParent(nodes, userId, session.parentId))) {
       return fail(reply, 409, 'PARENT_NOT_AVAILABLE', '目标文件夹已不可用，请重新选择位置');
     }
+    if (pair && !(await pairs.findOne({ _id: pair._id, status: 'approved' }))) {
+      return fail(reply, 410, 'PAIRING_INACTIVE', '电脑已结束本次扫码上传');
+    }
 
     const now = new Date();
     const node = {
@@ -248,7 +282,18 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       { _id: session._id, userId, status: 'pending' },
       { $set: { status: 'completed', completedAt: now, updatedAt: now } },
     );
+    if (pair && inserted) await pairs.updateOne({ _id: pair._id }, {
+      $inc: { completedCount: 1 },
+      $push: { recentFiles: { $each: [{ id: String(node._id), name: node.name }], $slice: -10 } },
+    });
 
     return { node: serializeFile(node), idempotent: !inserted };
+  }
+
+  app.post('/uploads/complete', { preHandler: requireAuth }, (req, reply) => completeUpload(req, reply));
+  app.post('/phone-uploads/:id/complete', async (req, reply) => {
+    const pair = await getPhonePairing(req, reply, db);
+    if (!pair) return;
+    return completeUpload(req, reply, pair);
   });
 }

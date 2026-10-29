@@ -10,6 +10,7 @@ import nodeRoutes from './routes/nodes.js';
 import shareRoutes from './routes/shares.js';
 import homeRoutes from './routes/home.js';
 import uploadRoutes from './routes/uploads.js';
+import phoneUploadRoutes from './routes/phone-uploads.js';
 import { createCosService } from './services/cos.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -84,6 +85,12 @@ export async function buildApp({ cfg, db }) {
   await app.register(uploadRoutes, {
     prefix: '/api/v1',
     cfg,
+    db,
+    requireAuth,
+    cos,
+  });
+  await app.register(phoneUploadRoutes, {
+    prefix: '/api/v1',
     db,
     requireAuth,
     cos,

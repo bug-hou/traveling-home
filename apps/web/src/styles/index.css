@@ -6,6 +6,7 @@
 @import 'tailwindcss/theme.css' layer(theme);
 @import '@arco-design/web-react/dist/css/arco.css' layer(components);
 @import 'tailwindcss/utilities.css' layer(utilities);
+@import './pwa.css' layer(components);
 
 @layer base {
   *,

@@ -1,0 +1,25 @@
+.phone-upload-page { min-height: 100dvh; padding: 32px 16px 64px; background: #f7f8f7; color: #203d40; font-family: 'DM Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; }
+.phone-upload-page * { box-sizing: border-box; }
+.phone-upload-shell { width: min(540px, 100%); margin: 0 auto; }
+.phone-upload-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 28px; font-size: 19px; font-weight: 750; letter-spacing: .04em; }
+.phone-upload-brand img { width: 35px; height: 35px; border-radius: 10px; }
+.phone-upload-brand span { color: #829794; font-size: 13px; font-weight: 500; }
+.phone-upload-card { margin-bottom: 14px; padding: 28px; border: 1px solid #e4eeea; border-radius: 18px; background: #fff; box-shadow: 0 10px 30px rgba(22, 66, 57, .03); }
+.phone-upload-eyebrow { color: #198878; font-size: 10px; font-weight: 700; letter-spacing: .18em; }
+.phone-upload-card h1 { margin: 10px 0; font-size: 25px; line-height: 1.35; }
+.phone-upload-card h2 { margin: 0 0 8px; font-size: 18px; }
+.phone-upload-card p { margin: 8px 0; color: #708784; font-size: 13px; line-height: 1.75; }
+.phone-upload-code { display: inline-block; margin: 14px 0 4px; padding: 12px 18px; border-radius: 10px; background: #edf7f3; color: #176d61; font-size: 29px; letter-spacing: .21em; }
+.phone-upload-card .phone-upload-error { color: #ac514d; overflow-wrap: anywhere; }
+.phone-upload-toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.phone-upload-toolbar .arco-btn { min-height: 42px; border-radius: 10px; }
+.phone-upload-hidden-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.phone-upload-list { display: grid; gap: 0; margin: 20px 0 0; padding: 0; list-style: none; }
+.phone-upload-list li { padding: 13px 0; border-top: 1px solid #ecf1ef; }
+.phone-upload-file-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.phone-upload-file-title b { min-width: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.phone-upload-file-title small { flex-shrink: 0; color: #54897d; }
+.phone-upload-list .arco-progress { width: 100%; margin-top: 7px; }
+.phone-upload-list li p { margin: 2px 0; font-size: 11px; overflow-wrap: anywhere; }
+.phone-upload-footnote { padding: 4px 8px; color: #879a96; font-size: 11px; line-height: 1.6; text-align: center; }
+@media (max-width: 540px) { .phone-upload-page { padding-top: 20px; } .phone-upload-card { padding: 22px 18px; } .phone-upload-card h1 { font-size: 22px; } }

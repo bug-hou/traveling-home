@@ -9,6 +9,7 @@
 - 前端流程约定：用户先设计页面，确认后才实现对应的前端业务；本阶段已确认登录页设计，可继续后续素材/地图页面，但需按功能分步推进。
 - 品牌与登录稿：用户认可暂定品牌名「迹光」及登录稿，选定 Logo C「行迹」（虚线路径汇入定位点），位于 design/assets/logo.svg；用户后续自行替换图片素材。正式 PC/H5 认证页已在 apps/web 实现，剩余素材/地图业务页待设计与开发。首页静态稿需保持 PC 最近素材/最近旅行卡片等高、动画丰富但克制，并尊重 prefers-reduced-motion。
 - 后端：Node.js（Fastify 5，ESM，zod 校验，argon2id，jose JWT）；MongoDB 原生驱动；地图用腾讯地图 JS API GL，县级点亮用 2dsphere 判定。
+- IP 粗定位选型（2026-10-29 用户确认）：使用 EdgeOne Makers Edge Functions 的内置 GEO 信息，不再考虑部署根目录 `ipv4.ipdb` 或 `ipv4_cn.txt.zip`；目前仅确定选型，具体使用场景/入口尚待确认，未实现或部署。IP 归属地不能替代素材 EXIF/SRT/GPS 精确坐标。
 - 认证接口：`/api/v1/auth/{register,login,refresh,logout,change-password,me}`，另加 `PATCH /auth/handle` 设置全站唯一、可修改的公开用户名（旧别名保留，内部 Mongo `_id`/JWT `sub`/COS 路径不变）。
 - 分享与展示型活动页（2026-10-28 后端与分享域名已部署；本地新版前端未随本轮发布）：只做展示，不接受访客投稿；公开链接采用固定 `share.convenience.top/{公开用户名}/{自定义路径}`，不用 `{用户名}.convenience.top`；下载限额按“签发下载链接次数”计数，不等于真实下载完成次数。数据集合 `shares` 与 `handles`；公开接口为 `POST /public/shares/:handle/:slug/browse` 和 `/files/:nodeId/access`；每次签发都按当前父链重新判定分享范围，撤销不能立即收回已签发链接。DNS、证书与 nginx SPA 回退均已配置；主站 `/app/` 与分享域名分别用 `VITE_APP_BASE=/app/` 与 `/` 构建；细节见 `docs/分享域名部署.md`。勾选“必须登录”的分享在分享域名上会因跨站 Cookie（SameSite=Lax）无法携带会话，这类分享改用提取码。
 - 含分享的后端（052651e）与主站 `/app/` 前端已于 2026-10-28 部署；备份 `/opt/movehome/api-previous-20261028-share`、`api.env.previous-20261028-share`、`/opt/movehome/www-app-previous-20261028-share`。部署通道经验：服务器 `git clone` GitHub 会挂住，改用 codeload 的 tar.gz；本机无 SSH 权限，只能用 Lighthouse 集成 `execute_command`；前端产物可用 Cloud Studio 沙箱预览 URL 作中转由服务器 curl 下载。
@@ -17,6 +18,7 @@
 - 本地开发：Vite `/api` 代理默认目标 `https://api.convenience.top`，对生产 API 请求代设 Origin `https://convenience.top`；本地有效注册、改密、登出会影响线上账号。通过 `VITE_API_PROXY_TARGET` / `VITE_API_PROXY_ORIGIN` 可改为本地 Node API。部署 Makers 时设置 `VITE_API_BASE_URL=https://api.convenience.top`。
 - 存储：腾讯云 COS，桶 test-cos-1312827847（ap-chengdu，私有），统一前缀 movehome/users/{userId}/...；视频转码用数据万象。2026-10-28 用户已绑定自定义源站域名 `assets.convenience.top`（默认源站、HTTPS 证书、强制 HTTPS、上线）；实测 DNS CNAME 指向该桶默认域名、HTTPS 证书校验通过，匿名根路径返回 403 符合私有桶预期；文件访问仍需单独验证签名 URL。
 - 文件字节不经后端，浏览器直连 COS（STS 临时凭证 / 签名 URL）；预览/下载后端签名时需使用自定义域名 Host，桶保持私有。
+- 2026-10-29 用户确认跨设备上传需求：电脑上传界面生成二维码，手机免登录扫码，电脑端核对配对码并确认后，手机从相册选择文件上传到电脑指定的迹光云端目录，电脑端自动显示结果；二维码不含登录凭据。本地 `apps/api` 与 `apps/web` 已实现，尚未部署/真实 COS 验收；上线前检查 COS 桶 CORS，且要处理已签发 COS STS 在授权撤销后仍可覆写同 Key 文件的风险（考虑隔离上传暂存区并服务端转存或版本化）。2026-10-29 因完成本地实现而更新状态。
 - 新上传素材自动定位约定（2026-10-28 用户确认；后端位置入库已发布，前端解析与上传交互仍仅本地实现）：仅 JPEG/JPG EXIF GPS；MP4/MOV 只关联同一次选择中唯一同名主体（忽略大小写）的 DJI SRT，重名/缺失/跨批不猜测；支持方括号纬经度和 GPS(lat,lon,alt)，跳过 HOME，只取首个有效 GPS 帧，轨迹留到以后；解析失败正常上传并显示“未定位”，可手动补充。后端仅凭认证上传会话入库可选 WGS-84 元数据，重复完成不覆盖用户手动位置。具体限制和契约见 `docs/需求与技术方案.md`；本期不做存量回扫、地图和县级点亮；自动定位前端未发布，后端已发布。
 - 媒体检索需求（2026-10-28 用户确认）：自建索引与检索链路，不使用 MetaInsight；原始图片/视频仍在私有普通 COS 桶，COS 向量桶可作独立向量索引候选但需核实地域（目前不支持成都）与邀测资格。需要关键词、自然语言描述、以图搜图（只找照片）、地点/时间；视频只返回整个文件，无片段定位；仅对后续新上传素材解析，不处理存量；音频首期不解析。Embedding 采用外部 API 还是自部署、视频抽帧预算与索引时效尚待用户确认。此前讨论的 MetaInsight 计价不适用该自建方案。
 

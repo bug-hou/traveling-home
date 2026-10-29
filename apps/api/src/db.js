@@ -24,6 +24,10 @@ async function ensureIndexes(db) {
   await uploadSessions.createIndex({ userId: 1, status: 1, expiresAt: 1 });
   await uploadSessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
+  const phonePairs = db.collection('phone_upload_pairs');
+  await phonePairs.createIndex({ userId: 1, createdAt: -1 });
+  await phonePairs.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
   const sessions = db.collection('sessions');
   await sessions.createIndex({ tokenHash: 1 }, { unique: true });
   await sessions.createIndex({ familyId: 1 });
