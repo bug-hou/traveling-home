@@ -22,6 +22,12 @@ test('image processing is disabled by default and only enabled explicitly', () =
   assert.equal(loadConfig(baseEnv({ COS_IMAGE_PROCESSING_ENABLED: 'false' })).imageProcessingEnabled, false);
 });
 
+test('phone uploads stay disabled unless explicitly enabled', () => {
+  assert.equal(loadConfig(baseEnv()).phoneUploadsEnabled, false);
+  assert.equal(loadConfig(baseEnv({ PHONE_UPLOADS_ENABLED: 'true' })).phoneUploadsEnabled, true);
+  assert.equal(loadConfig(baseEnv({ PHONE_UPLOADS_ENABLED: 'false' })).phoneUploadsEnabled, false);
+});
+
 test('COS config derives the account ID from the bucket and normalizes prefix slashes', () => {
   const config = loadConfig(
     baseEnv({

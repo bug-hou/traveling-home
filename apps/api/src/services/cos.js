@@ -9,6 +9,8 @@ const UPLOAD_ACTIONS = [
   'name/cos:AbortMultipartUpload',
   'name/cos:ListParts',
 ];
+const COPY_PART_SIZE = 1024 ** 3;
+const SIMPLE_COPY_LIMIT = 4 * COPY_PART_SIZE;
 
 const DOWNLOAD_EXTENSIONS = {
   'image/jpeg': ['jpg', 'jpeg'],
@@ -57,6 +59,36 @@ function cosCall(cos, method, params) {
   });
 }
 
+export async function copyVerifiedObject(client, { bucket, region, sourceKey, key, size, etag, mime }) {
+  if (sourceKey === key || !Number.isSafeInteger(size) || size < 0 || !(/^[a-f\d]{32}(?:-\d+)?$/i.test(etag) || /^"[a-f\d]{32}(?:-\d+)?"$/i.test(etag))) {
+    throw new Error('invalid COS copy source');
+  }
+  const CopySource = `${bucket}.cos.${region}.myqcloud.com/${sourceKey.split('/').map(encodeURIComponent).join('/')}`;
+  const destination = { Bucket: bucket, Region: region, Key: key };
+  if (size <= SIMPLE_COPY_LIMIT) {
+    return cosCall(client, 'putObjectCopy', { ...destination, CopySource, CopySourceIfMatch: etag });
+  }
+
+  const { UploadId } = await cosCall(client, 'multipartInit', { ...destination, ContentType: mime });
+  if (!UploadId) throw new Error('COS multipart init returned no upload ID');
+  try {
+    const Parts = [];
+    for (let offset = 0; offset < size; offset += COPY_PART_SIZE) {
+      const part = await cosCall(client, 'uploadPartCopy', {
+        ...destination, CopySource, CopySourceIfMatch: etag, UploadId,
+        PartNumber: Parts.length + 1,
+        CopySourceRange: `bytes=${offset}-${Math.min(size - 1, offset + COPY_PART_SIZE - 1)}`,
+      });
+      if (!part.ETag) throw new Error('COS multipart copy returned no ETag');
+      Parts.push({ PartNumber: Parts.length + 1, ETag: part.ETag });
+    }
+    return await cosCall(client, 'multipartComplete', { ...destination, UploadId, Parts });
+  } catch (error) {
+    try { await cosCall(client, 'multipartAbort', { ...destination, UploadId }); } catch {}
+    throw error;
+  }
+}
+
 export function createCosService(cfg) {
   if (!cfg.cos) return null;
 
@@ -95,6 +127,14 @@ export function createCosService(cfg) {
 
     async headObject(key) {
       return cosCall(client, 'headObject', { Bucket: bucket, Region: region, Key: key });
+    },
+
+    async promoteObject({ sourceKey, key, size, etag, mime }) {
+      return copyVerifiedObject(client, { bucket, region, sourceKey, key, size, etag, mime });
+    },
+
+    async deleteObject(key) {
+      return cosCall(client, 'deleteObject', { Bucket: bucket, Region: region, Key: key });
     },
 
     async signReadUrl(key, { disposition, mime, thumbnail = false, expires = 600 }) {

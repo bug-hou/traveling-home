@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="迹光">
+  <defs>
+    <linearGradient id="route-bg" x1="6" y1="2" x2="58" y2="62" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2DD4BF"/><stop offset=".5" stop-color="#0D9488"/><stop offset="1" stop-color="#0E7490"/>
+    </linearGradient>
+    <radialGradient id="route-glow"><stop offset="0" stop-color="#CCFBF1" stop-opacity=".65"/><stop offset="1" stop-color="#CCFBF1" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#route-bg)"/>
+  <path d="M14 50C14 39 28 41 28 32S18 23 27 18C34 13 37 18 45 18" fill="none" stroke="#CCFBF1" stroke-width="3.4" stroke-linecap="round" stroke-dasharray=".1 6.2"/>
+  <circle cx="13.5" cy="50" r="4" fill="#fff" fill-opacity=".9"/><circle cx="45" cy="19" r="16" fill="url(#route-glow)"/>
+  <path fill="#fff" fill-rule="evenodd" d="M45 8a10 10 0 0 0-10 10c0 7.2 10 16 10 16s10-8.8 10-16A10 10 0 0 0 45 8zm0 13.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/>
+  <circle cx="45" cy="18" r="1.6" fill="#0F766E"/>
+</svg>

@@ -44,11 +44,12 @@ export async function getPhonePairing(req, reply, db, { forCredentials = false }
   return pair;
 }
 
-export default async function phoneUploadRoutes(app, { db, requireAuth, cos }) {
+export default async function phoneUploadRoutes(app, { cfg, db, requireAuth, cos }) {
   const pairs = db.collection('phone_upload_pairs');
   const nodes = db.collection('nodes');
   const noStore = (reply) => reply.header('Cache-Control', 'no-store');
 
+  if (cfg.phoneUploadsEnabled === true) {
   app.post('/phone-uploads', { preHandler: requireAuth }, async (req, reply) => {
     if (!cos) return fail(reply, 503, 'UPLOADS_NOT_CONFIGURED', '上传服务暂不可用');
     const body = parseBody(createBody, req.body, reply);
@@ -69,7 +70,7 @@ export default async function phoneUploadRoutes(app, { db, requireAuth, cos }) {
     const pair = {
       _id: new ObjectId(), userId: req.user._id, parentId, status: 'pending',
       qrHash: hash(qrSecret), deviceHash: null, code: null,
-      issuedCount: 0, completedCount: 0, recentFiles: [],
+      issuedCount: 0, completedCount: 0, activePromotions: 0, recentFiles: [],
       createdAt: now, joinUntil: new Date(now.getTime() + JOIN_TTL_MS),
       expiresAt: new Date(now.getTime() + RECORD_TTL_MS),
     };
@@ -127,7 +128,14 @@ export default async function phoneUploadRoutes(app, { db, requireAuth, cos }) {
     );
     if (!result.matchedCount) return fail(reply, 404, 'PAIRING_NOT_FOUND', '扫码会话不存在');
     noStore(reply);
-    return { status: 'revoked' };
+    const deadline = Date.now() + 25_000;
+    while (true) {
+      const current = await pairs.findOne({ _id: id, userId: req.user._id });
+      if (!current) return fail(reply, 503, 'REVOCATION_PENDING', '撤销处理中，请稍后重试');
+      if (!current.activePromotions) return { status: 'revoked' };
+      if (Date.now() >= deadline) return fail(reply, 503, 'REVOCATION_PENDING', '撤销处理中，请稍后重试');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   });
 
   app.post('/phone-uploads/:id/join', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (req, reply) => {
@@ -169,6 +177,7 @@ export default async function phoneUploadRoutes(app, { db, requireAuth, cos }) {
       ? await nodes.findOne({ _id: pair.parentId, userId: pair.userId, type: 'folder', deletedAt: null }) : null;
     return { status, code: status === 'awaiting' ? pair.code : null, folderName: status === 'approved' ? (pair.parentId ? folder?.name ?? '目标文件夹已不可用' : '全部文件') : null, approvedUntil: pair.approvedUntil ?? null };
   });
+  }
 
   const notePairs = db.collection('note_read_pairs');
   const notes = db.collection('notes');

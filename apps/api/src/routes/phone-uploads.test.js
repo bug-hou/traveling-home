@@ -11,6 +11,7 @@ function matches(doc, filter) {
     if (value && typeof value === 'object' && !(value instanceof ObjectId) && !(value instanceof Date)) {
       if ('$gt' in value) return doc[key] > value.$gt;
       if ('$lt' in value) return doc[key] < value.$lt;
+      if ('$lte' in value) return doc[key] <= value.$lte;
       if ('$in' in value) return value.$in.includes(doc[key]);
     }
     return same(doc[key], value);
@@ -45,19 +46,31 @@ function fakeDb() {
   }));
   return { collection: (name) => collections[name] };
 }
-async function setup(t) {
+async function setup(t, phoneUploadsEnabled = true) {
   const app = Fastify();
   const db = fakeDb();
+  const objects = new Map();
   const cos = {
-    async issueUploadCredentials() { return { credentials: { tmpSecretId: 'id', tmpSecretKey: 'key', sessionToken: 'token' }, expiresAt: new Date(Date.now() + 1800000) }; },
-    async headObject() { return { headers: { 'content-length': '12' } }; },
+    objects,
+    issuedKeys: [],
+    async issueUploadCredentials({ key }) {
+      this.issuedKeys.push(key);
+      return { credentials: { tmpSecretId: 'id', tmpSecretKey: 'key', sessionToken: 'token' }, expiresAt: new Date(Date.now() + 1800000) };
+    },
+    async headObject(key) {
+      const content = objects.get(key) ?? 'original';
+      return { headers: { 'content-length': '12', etag: content === 'original'
+        ? '"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' : '"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"' }, content };
+    },
+    async promoteObject({ sourceKey, key }) { objects.set(key, objects.get(sourceKey) ?? 'original'); },
+    async deleteObject(key) { objects.delete(key); },
   };
-  const cfg = { cos: { bucket: 'bucket-123', region: 'ap-chengdu', prefix: 'movehome' } };
+  const cfg = { cos: { bucket: 'bucket-123', region: 'ap-chengdu', prefix: 'movehome' }, phoneUploadsEnabled };
   const requireAuth = async (req, reply) => {
     if (!req.headers['x-test-user']) return reply.code(401).send({ error: { code: 'UNAUTHORIZED' } });
     req.user = { _id: new ObjectId(req.headers['x-test-user']) };
   };
-  await app.register(phoneUploadRoutes, { prefix: '/api/v1', db, requireAuth, cos });
+  await app.register(phoneUploadRoutes, { prefix: '/api/v1', cfg, db, requireAuth, cos });
   await app.register(uploadRoutes, { prefix: '/api/v1', db, requireAuth, cos, cfg });
   t.after(() => app.close());
   const owner = new ObjectId();
@@ -69,8 +82,36 @@ async function setup(t) {
   return { app, db, cos, owner, other, parent, send, create };
 }
 
+async function startPairedUpload(context) {
+  const { owner, send, create } = context;
+  const { id, secret } = (await create()).json();
+  const deviceToken = 'z'.repeat(43);
+  assert.equal((await send('POST', `/${id}/join`, { secret, deviceToken })).statusCode, 200);
+  assert.equal((await send('POST', `/${id}/approve`, {}, { 'x-test-user': String(owner) })).statusCode, 200);
+  const auth = { authorization: `Bearer ${deviceToken}` };
+  const response = await send('POST', `/${id}/credentials`, { name: 'a.jpg', size: 12 }, auth);
+  assert.equal(response.statusCode, 201, response.body);
+  return { id, auth, upload: response.json(), complete: () => send('POST', `/${id}/complete`, { uploadId: response.json().uploadId }, auth) };
+}
+
+test('禁用手机上传时不暴露任一手机接口，笔记配对及普通上传仍可用', async (t) => {
+  const { app, owner, send } = await setup(t, false);
+  const headers = { 'x-test-user': String(owner) };
+  const id = String(new ObjectId());
+  for (const [method, path] of [
+    ['POST', ''], ['GET', '/active'], ['GET', `/${id}`],
+    ['POST', `/${id}/approve`], ['POST', `/${id}/revoke`], ['POST', `/${id}/join`],
+    ['GET', `/${id}/status`], ['POST', `/${id}/credentials`], ['POST', `/${id}/complete`],
+  ]) {
+    assert.equal((await send(method, path, {}, headers)).statusCode, 404, `${method} ${path}`);
+  }
+  const notePair = await app.inject({ method: 'POST', url: '/api/v1/note-pairs', payload: { noteId: id }, headers });
+  assert.equal(notePair.json().error?.code, 'NOTE_NOT_FOUND');
+  assert.equal((await app.inject({ method: 'POST', url: '/api/v1/uploads/credentials', payload: { name: 'a.jpg', size: 1 }, headers })).statusCode, 201);
+});
+
 test('扫码请求需电脑确认，不能跨目录、跨设备或越权完成其他上传', async (t) => {
-  const { db, owner, other, parent, send, create } = await setup(t);
+  const { app, db, cos, owner, other, parent, send, create } = await setup(t);
   const created = await create();
   assert.equal(created.statusCode, 201, created.body);
   const { id, secret } = created.json();
@@ -96,6 +137,12 @@ test('扫码请求需电脑确认，不能跨目录、跨设备或越权完成�
   assert.equal(credentials.statusCode, 201, credentials.body);
   const upload = credentials.json();
   assert.equal(String(db.collection('upload_sessions').documents[0].parentId), String(parent));
+  assert.match(upload.key, new RegExp(`^movehome/users/${owner}/incoming/${id}/${upload.uploadId}\\.jpg$`));
+  assert.deepEqual(cos.issuedKeys, [upload.key]);
+  cos.objects.set(upload.key, 'original');
+  const bypass = await app.inject({ method: 'POST', url: '/api/v1/uploads/complete',
+    payload: { uploadId: upload.uploadId }, headers: { 'x-test-user': String(owner) } });
+  assert.equal(bypass.statusCode, 404);
   const foreign = await send('POST', `/${id}/complete`, { uploadId: String(new ObjectId()) }, auth);
   assert.equal(foreign.statusCode, 404);
   const complete = () => send('POST', `/${id}/complete`, { uploadId: upload.uploadId }, auth);
@@ -105,9 +152,115 @@ test('扫码请求需电脑确认，不能跨目录、跨设备或越权完成�
   assert.equal(desktopResult.completedCount, 1);
   assert.deepEqual(desktopResult.recentFiles, [{ id: upload.fileId, name: 'a.jpg' }]);
   assert.equal(db.collection('nodes').documents[1].name, 'a.jpg');
+  const finalKey = db.collection('nodes').documents[1].cosKey;
+  assert.notEqual(finalKey, upload.key);
+  assert.match(finalKey, new RegExp(`^movehome/users/${owner}/originals/`));
+  assert.equal(cos.objects.get(finalKey), 'original');
   assert.equal((await send('POST', `/${id}/revoke`, {}, { 'x-test-user': String(owner) })).statusCode, 200);
+  cos.objects.set(upload.key, 'overwritten');
+  assert.equal(cos.objects.get(finalKey), 'original');
   assert.equal((await complete()).statusCode, 403);
   assert.equal((await send('POST', `/${id}/credentials`, { name: 'b.jpg', size: 12 }, auth)).statusCode, 403);
+});
+
+test('旧版直写会话与复制源变化不能登记，重试使用不同目标 Key', async (t) => {
+  const context = await setup(t);
+  const { db, cos } = context;
+  const { upload, complete } = await startPairedUpload(context);
+  const session = db.collection('upload_sessions').documents[0];
+  const stagingKey = session.stagingKey;
+  session.stagingKey = undefined;
+  assert.equal((await complete()).json().error.code, 'UPLOAD_SESSION_UNSAFE');
+  session.stagingKey = stagingKey;
+  cos.objects.set(stagingKey, 'original');
+  const keys = [];
+  cos.promoteObject = async ({ sourceKey, key }) => {
+    keys.push(key);
+    cos.objects.set(key, cos.objects.get(sourceKey));
+    if (keys.length === 1) cos.objects.set(sourceKey, 'overwritten');
+  };
+  const failed = await complete();
+  assert.equal(failed.statusCode, 503);
+  assert.equal(cos.objects.has(keys[0]), false);
+  assert.equal(db.collection('nodes').documents.length, 1);
+  assert.equal(session.status, 'pending');
+  const retry = await complete();
+  assert.equal(retry.statusCode, 200, retry.body);
+  assert.equal(keys.length, 2);
+  assert.notEqual(keys[0], keys[1]);
+  assert.equal(db.collection('nodes').documents[1].cosKey, keys[1]);
+  assert.notEqual(db.collection('nodes').documents[1].cosKey, upload.key);
+});
+
+test('复制故障可重试，过期的晋升租约不会覆盖随后发布的对象', async (t) => {
+  const context = await setup(t);
+  const { db, cos } = context;
+  const { complete } = await startPairedUpload(context);
+  const session = db.collection('upload_sessions').documents[0];
+  const original = cos.promoteObject;
+  cos.promoteObject = async () => { throw new Error('COS unavailable'); };
+  assert.equal((await complete()).statusCode, 503);
+  assert.equal(session.status, 'pending');
+  session.status = 'promoting';
+  session.promotionId = 'stale';
+  session.promotionUntil = new Date(Date.now() - 1);
+  cos.promoteObject = original;
+  assert.equal((await complete()).statusCode, 200);
+  assert.equal(session.status, 'completed');
+  const published = db.collection('nodes').documents[1].cosKey;
+  assert.notEqual(published, session.stagingKey);
+  assert.equal((await complete()).json().idempotent, true);
+  assert.equal(db.collection('nodes').documents[1].cosKey, published);
+});
+
+test('撤销发生在复制中时不登记新文件，并发登记只允许一次复制', async (t) => {
+  const context = await setup(t);
+  const { db, cos, owner, send } = context;
+  const { id, complete } = await startPairedUpload(context);
+  let started;
+  const copying = new Promise((resolve) => { started = resolve; });
+  let unblock;
+  const blocked = new Promise((resolve) => { unblock = resolve; });
+  cos.promoteObject = async () => { started(); await blocked; };
+  const first = complete();
+  await copying;
+  assert.equal((await complete()).json().error.code, 'UPLOAD_IN_PROGRESS');
+  const revocation = send('POST', `/${id}/revoke`, {}, { 'x-test-user': String(owner) });
+  while (db.collection('phone_upload_pairs').documents[0].status !== 'revoked') {
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  assert.equal(db.collection('phone_upload_pairs').documents[0].activePromotions, 1);
+  unblock();
+  assert.equal((await first).statusCode, 410);
+  assert.equal((await revocation).statusCode, 200);
+  assert.equal(db.collection('phone_upload_pairs').documents[0].activePromotions, 0);
+  assert.equal(db.collection('nodes').documents.length, 1);
+});
+
+test('撤销必须等待最终节点登记完毕才能确认成功', async (t) => {
+  const context = await setup(t);
+  const { db, owner, send } = context;
+  const { id, complete } = await startPairedUpload(context);
+  const nodes = db.collection('nodes');
+  const originalInsert = nodes.insertOne;
+  let pauseInsert;
+  const inserting = new Promise((resolve) => { pauseInsert = resolve; });
+  let resumeInsert;
+  const blocked = new Promise((resolve) => { resumeInsert = resolve; });
+  nodes.insertOne = async (document) => { pauseInsert(); await blocked; return originalInsert(document); };
+  const registration = complete();
+  await inserting;
+  let revokeFinished = false;
+  const revocation = send('POST', `/${id}/revoke`, {}, { 'x-test-user': String(owner) })
+    .then((response) => { revokeFinished = true; return response; });
+  while (db.collection('phone_upload_pairs').documents[0].status !== 'revoked') {
+    await new Promise((resolve) => setTimeout(resolve, 1));
+  }
+  assert.equal(revokeFinished, false);
+  resumeInsert();
+  assert.equal((await registration).statusCode, 200);
+  assert.equal((await revocation).statusCode, 200);
+  assert.equal(nodes.documents.length, 2);
 });
 
 test('无效目录、二维码过期、授权到期和次数上限不签发 COS 凭证', async (t) => {

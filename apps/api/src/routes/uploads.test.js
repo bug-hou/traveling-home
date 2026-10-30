@@ -4,6 +4,7 @@ import Fastify from 'fastify';
 import { ObjectId } from 'mongodb';
 import uploadRoutes from './uploads.js';
 import nodeRoutes from './nodes.js';
+import { copyVerifiedObject } from '../services/cos.js';
 
 function same(left, right) {
   if (left instanceof ObjectId || right instanceof ObjectId) return String(left) === String(right);
@@ -97,6 +98,35 @@ function fakeCos({ head = { headers: { 'content-length': '2048' } }, onHead = ()
     },
   };
 }
+
+test('手机临时对象复制使用条件 ETag，大于单次上限则逐块复制并在失败时中止', async () => {
+  const calls = [];
+  let failPart = false;
+  const client = Object.fromEntries(['putObjectCopy', 'multipartInit', 'uploadPartCopy', 'multipartComplete', 'multipartAbort'].map((method) =>
+    [method, (params, callback) => {
+      calls.push({ method, params });
+      if (method === 'uploadPartCopy' && failPart) return callback(Object.assign(new Error('source changed'), { statusCode: 412 }));
+      callback(null, method === 'multipartInit' ? { UploadId: 'task' } : { ETag: '"part"' });
+    }]));
+  const input = { bucket: 'test-1234567890', region: 'ap-chengdu', sourceKey: 'movehome/incoming/a.jpg',
+    key: 'movehome/originals/b.jpg', size: 0, etag: '"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"', mime: 'image/jpeg' };
+  await copyVerifiedObject(client, input);
+  assert.deepEqual(calls.map(({ method }) => method), ['putObjectCopy']);
+  assert.equal(calls[0].params.CopySourceIfMatch, input.etag);
+  assert.equal(calls[0].params.CopySource, 'test-1234567890.cos.ap-chengdu.myqcloud.com/movehome/incoming/a.jpg');
+  calls.length = 0;
+  await copyVerifiedObject(client, { ...input, size: 5 * 1024 ** 3 });
+  assert.deepEqual(calls.map(({ method }) => method),
+    ['multipartInit', ...Array(5).fill('uploadPartCopy'), 'multipartComplete']);
+  assert.equal(calls[0].params.ContentType, 'image/jpeg');
+  assert.ok(calls.filter(({ method }) => method === 'uploadPartCopy').every(({ params }) => params.CopySourceIfMatch === input.etag));
+  assert.equal(calls.at(-1).params.Parts.length, 5);
+  calls.length = 0;
+  failPart = true;
+  await assert.rejects(copyVerifiedObject(client, { ...input, size: 5 * 1024 ** 3 }), /source changed/);
+  assert.deepEqual(calls.map(({ method }) => method), ['multipartInit', 'uploadPartCopy', 'multipartAbort']);
+  await assert.rejects(copyVerifiedObject(client, { ...input, etag: '' }), /invalid COS copy source/);
+});
 
 test('upload routes require authentication and report missing COS configuration', async (t) => {
   const unavailable = await createApp({ configured: false });

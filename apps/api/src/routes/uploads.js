@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { fail, parseBody } from '../lib/http.js';
@@ -55,6 +56,11 @@ function getContentLength(head) {
     head?.contentLength;
   const size = Number(value);
   return Number.isSafeInteger(size) && size >= 0 ? size : null;
+}
+
+function getEtag(head) {
+  const etag = head?.headers?.etag ?? head?.headers?.ETag ?? head?.ETag;
+  return typeof etag === 'string' && (/^[a-f\d]{32}(?:-\d+)?$/i.test(etag) || /^"[a-f\d]{32}(?:-\d+)?"$/i.test(etag)) ? etag : null;
 }
 
 function isObjectNotFound(error) {
@@ -122,6 +128,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     const nodeId = new ObjectId();
     const datePath = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
     const key = `${cfg.cos.prefix}/users/${userId}/originals/${datePath}/${nodeId}${extensionFor(body.name)}`;
+    const stagingKey = pair ? `${cfg.cos.prefix}/users/${userId}/incoming/${pair._id}/${uploadId}${extensionFor(body.name)}` : null;
     const expiresAt = new Date(now.getTime() + UPLOAD_SESSION_TTL_MS);
     const credentialExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
     const session = {
@@ -137,7 +144,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       createdAt: now,
       expiresAt,
       credentialExpiresAt,
-      ...(pair ? { phonePairId: pair._id } : {}),
+      ...(pair ? { phonePairId: pair._id, stagingKey } : {}),
     };
 
     if (pair) {
@@ -150,7 +157,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
 
     let authorization;
     try {
-      authorization = await cos.issueUploadCredentials({ key });
+      authorization = await cos.issueUploadCredentials({ key: stagingKey ?? key });
     } catch {
       if (pair) await pairs.updateOne({ _id: pair._id }, { $inc: { issuedCount: -1 } });
       return fail(reply, 503, 'UPLOAD_AUTH_UNAVAILABLE', '暂时无法创建上传授权，请稍后重试');
@@ -161,6 +168,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
         await pairs.updateOne({ _id: pair._id }, { $inc: { issuedCount: -1 } });
         return fail(reply, 410, 'PAIRING_INACTIVE', '电脑已结束本次扫码上传');
       }
+      session.credentialExpiresAt = authorization.expiresAt;
       await sessions.insertOne(session);
     } catch {
       if (pair) await pairs.updateOne({ _id: pair._id }, { $inc: { issuedCount: -1 } });
@@ -173,18 +181,20 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       fileId: String(nodeId),
       bucket: cfg.cos.bucket,
       region: cfg.cos.region,
-      key,
+      key: stagingKey ?? key,
       credentials: authorization.credentials,
       expiresAt: authorization.expiresAt,
     });
   }
 
   app.post('/uploads/credentials', { preHandler: requireAuth }, (req, reply) => createCredentials(req, reply));
-  app.post('/phone-uploads/:id/credentials', async (req, reply) => {
-    const pair = await getPhonePairing(req, reply, db, { forCredentials: true });
-    if (!pair) return;
-    return createCredentials(req, reply, pair);
-  });
+  if (cfg.phoneUploadsEnabled === true) {
+    app.post('/phone-uploads/:id/credentials', async (req, reply) => {
+      const pair = await getPhonePairing(req, reply, db, { forCredentials: true });
+      if (!pair) return;
+      return createCredentials(req, reply, pair);
+    });
+  }
 
   async function completeUpload(req, reply, pair = null) {
     const body = parseBody(completeBody, req.body, reply);
@@ -193,7 +203,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     const userId = pair ? pair.userId : req.user._id;
     const uploadId = new ObjectId(body.uploadId);
     const session = await sessions.findOne({ _id: uploadId, userId, ...(pair ? { phonePairId: pair._id } : {}) });
-    if (!session) return fail(reply, 404, 'UPLOAD_SESSION_NOT_FOUND', '上传任务不存在或已过期');
+    if (!session || !pair && session.phonePairId) return fail(reply, 404, 'UPLOAD_SESSION_NOT_FOUND', '上传任务不存在或已过期');
     if (body.location) {
       const { name, mime } = session;
       const matchesFile = body.location.source === 'exif'
@@ -213,8 +223,14 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       return { node: serializeFile(existingNode), idempotent: true };
     }
 
-    if (session.status !== 'pending' || session.expiresAt <= new Date()) {
+    if (pair && session.status === 'promoting' && session.promotionUntil > new Date()) {
+      return fail(reply, 409, 'UPLOAD_IN_PROGRESS', '文件正在登记，请稍后重试');
+    }
+    if (!['pending', ...(pair ? ['promoting'] : [])].includes(session.status) || session.expiresAt <= new Date()) {
       return fail(reply, 410, 'UPLOAD_SESSION_EXPIRED', '上传任务已过期，请重新上传');
+    }
+    if (pair && (!session.stagingKey || !session.stagingKey.startsWith(`${cfg.cos.prefix}/users/${userId}/incoming/${pair._id}/`))) {
+      return fail(reply, 409, 'UPLOAD_SESSION_UNSAFE', '旧版扫码上传任务不可登记，请重新上传');
     }
 
     if (!(await findActiveParent(nodes, userId, session.parentId))) {
@@ -223,7 +239,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
 
     let head;
     try {
-      head = await cos.headObject(session.cosKey);
+      head = await cos.headObject(pair ? session.stagingKey : session.cosKey);
     } catch (error) {
       if (isObjectNotFound(error)) {
         return fail(reply, 409, 'UPLOAD_OBJECT_NOT_FOUND', '未找到已上传的文件对象');
@@ -239,8 +255,55 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     if (!(await findActiveParent(nodes, userId, session.parentId))) {
       return fail(reply, 409, 'PARENT_NOT_AVAILABLE', '目标文件夹已不可用，请重新选择位置');
     }
-    if (pair && !(await pairs.findOne({ _id: pair._id, status: 'approved' }))) {
-      return fail(reply, 410, 'PAIRING_INACTIVE', '电脑已结束本次扫码上传');
+    let promotion = null;
+    let pairLease = false;
+    try {
+    if (pair) {
+      if (!(await pairs.findOne({ _id: pair._id, status: 'approved', deviceHash: pair.deviceHash, approvedUntil: { $gt: new Date() } }))) {
+        return fail(reply, 410, 'PAIRING_INACTIVE', '电脑已结束本次扫码上传');
+      }
+      const etag = getEtag(head);
+      if (!etag) return fail(reply, 502, 'STORAGE_RESPONSE_INVALID', '存储服务未返回有效的对象标识');
+      const id = randomBytes(16).toString('hex');
+      const extension = extensionFor(session.name);
+      const stem = extension ? session.cosKey.slice(0, -extension.length) : session.cosKey;
+      const key = `${stem}-${id}${extension}`;
+      const now = new Date();
+      const lease = await pairs.updateOne(
+        { _id: pair._id, status: 'approved', deviceHash: pair.deviceHash, approvedUntil: { $gt: now } },
+        { $inc: { activePromotions: 1 } },
+      );
+      if (!lease.matchedCount) return fail(reply, 410, 'PAIRING_INACTIVE', '电脑已结束本次扫码上传');
+      pairLease = true;
+      const claim = await sessions.updateOne(
+        { _id: session._id, userId, phonePairId: pair._id,
+          ...(session.status === 'pending' ? { status: 'pending' } : { status: 'promoting', promotionUntil: { $lte: now } }) },
+        { $set: { status: 'promoting', promotionId: id, promotionUntil: new Date(now.getTime() + 10 * 60_000) } },
+      );
+      if (!claim.matchedCount) return fail(reply, 409, 'UPLOAD_IN_PROGRESS', '文件正在登记，请稍后重试');
+      promotion = { id, key };
+      try {
+        await cos.promoteObject({ sourceKey: session.stagingKey, key, size: actualSize, etag, mime: session.mime });
+        const copied = await cos.headObject(key);
+        if (getContentLength(copied) !== actualSize) throw new Error('COS promoted object size mismatch');
+        const sourceAfterCopy = await cos.headObject(session.stagingKey);
+        if (getEtag(sourceAfterCopy) !== etag || getContentLength(sourceAfterCopy) !== actualSize) {
+          throw new Error('COS copy source changed during promotion');
+        }
+      } catch (error) {
+        try { await cos.deleteObject(key); } catch {}
+        await sessions.updateOne({ _id: session._id, userId, status: 'promoting', promotionId: id },
+          { $set: { status: 'pending' } });
+        return fail(reply, 503, 'STORAGE_UNAVAILABLE', '文件转存失败，请稍后重试登记');
+      }
+      if (!(await pairs.findOne({ _id: pair._id, status: 'approved', deviceHash: pair.deviceHash, approvedUntil: { $gt: new Date() } }))
+        || !(await sessions.findOne({ _id: session._id, userId, status: 'promoting', promotionId: id }))
+        || !(await findActiveParent(nodes, userId, session.parentId))) {
+        try { await cos.deleteObject(key); } catch {}
+        await sessions.updateOne({ _id: session._id, userId, status: 'promoting', promotionId: id },
+          { $set: { status: 'pending' } });
+        return fail(reply, 410, 'PAIRING_INACTIVE', '授权已结束或上传目标已不可用');
+      }
     }
 
     const now = new Date();
@@ -253,7 +316,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
       size: actualSize,
       mime: session.mime,
       hash: null,
-      cosKey: session.cosKey,
+      cosKey: promotion?.key ?? session.cosKey,
       status: 'ready',
       uploadSessionId: session._id,
       ...(body.location ? { mediaLocation: { ...body.location, placeName: null } } : {}),
@@ -267,7 +330,11 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     try {
       await nodes.insertOne(node);
     } catch (error) {
-      if (error?.code !== 11000) throw error;
+      if (error?.code !== 11000) {
+        if (promotion) await sessions.updateOne({ _id: session._id, userId, status: 'promoting', promotionId: promotion.id },
+          { $set: { status: 'pending' } });
+        throw error;
+      }
       inserted = false;
       const existingNode = await nodes.findOne({
         _id: session.nodeId,
@@ -279,7 +346,7 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     }
 
     await sessions.updateOne(
-      { _id: session._id, userId, status: 'pending' },
+      { _id: session._id, userId, ...(promotion ? { status: 'promoting', promotionId: promotion.id } : { status: 'pending' }) },
       { $set: { status: 'completed', completedAt: now, updatedAt: now } },
     );
     if (pair && inserted) await pairs.updateOne({ _id: pair._id }, {
@@ -288,12 +355,17 @@ export default async function uploadRoutes(app, { cfg, db, requireAuth, cos }) {
     });
 
     return { node: serializeFile(node), idempotent: !inserted };
+    } finally {
+      if (pairLease) await pairs.updateOne({ _id: pair._id }, { $inc: { activePromotions: -1 } });
+    }
   }
 
   app.post('/uploads/complete', { preHandler: requireAuth }, (req, reply) => completeUpload(req, reply));
-  app.post('/phone-uploads/:id/complete', async (req, reply) => {
-    const pair = await getPhonePairing(req, reply, db);
-    if (!pair) return;
-    return completeUpload(req, reply, pair);
-  });
+  if (cfg.phoneUploadsEnabled === true) {
+    app.post('/phone-uploads/:id/complete', async (req, reply) => {
+      const pair = await getPhonePairing(req, reply, db);
+      if (!pair) return;
+      return completeUpload(req, reply, pair);
+    });
+  }
 }

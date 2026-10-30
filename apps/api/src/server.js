@@ -92,6 +92,7 @@ export async function buildApp({ cfg, db }) {
   });
   await app.register(phoneUploadRoutes, {
     prefix: '/api/v1',
+    cfg,
     db,
     requireAuth,
     cos,
